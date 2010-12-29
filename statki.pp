@@ -9,6 +9,7 @@ type
   end;
 
   area = array['A'..'J'] of array[1..10] of char; { akwen morski :) }
+  areas = array[1..2] of area;
   area_of_weights = array['A'..'J'] of array[1..10] of integer; { wagi na akwenie morskim }
   direction = (pionowo, poziomo); { wybór kierunku, w którym chcemy umieścić statek. Lewy górny róg statku będzie określany }
 
@@ -22,6 +23,7 @@ const
   greeting_color = 14; { 14 - żółty }
   error_color = 4; { 4 - czerwony }
   area_color = 15; { 15 - biały }
+  width_between_areas = 10; { ilość spacji między dwoma tabelami }
   ships : array[1..5] of integer = (5,4,3,3,2); { możliwe statki do wyboru }
   win_if = 17; { wygrana, gdy trafi wszystkie statki, inaczej: suma długości statków, poki co na sztywno 17 }
   default_mark = ' '; { znacznik pustego pola na planszy }
@@ -43,8 +45,8 @@ const
 
 var
   state : integer; { stan programu: 0 - brak rozgrywki, 1 - gracz vs cpu, 2 - cpu vs cpu }
-  choice : char; { ostatnio nacisniety klawisz do obslugi menu }
   target : shot; { miejsce, w ktore chcemy strzelic }
+  choice : char; { ostatnio nacisnieŧy klawisz do obslugi menu }
   { tablice z przedrostkiem player1 odnosza sie do pierwszego zawodnika, czy to cpu1 czy playera.
     ships_on_area - plansza widziana przez danego gracza z jego własnymi statkami i strzałami przeciwnika.
     shots_on_area - plansza widziana przez danego gracza z jego własnymi strzałami }
@@ -69,29 +71,80 @@ begin
   textcolor(input_color);
 end;
 
-{ METHOD: print_area - rysowanie planszy gracza podczas dodawania statków }
-procedure print_area(plansza : area);
-var
-  y : char;
-  x : integer;
+{ METHOD:HELPER: print_head_of_area - wypisuje nagłówek tabeli podaną ilość razy } 
+procedure print_head_of_area(how_many_times : integer);
+var i, x : integer;
 
 begin
   textcolor(area_color);
-  write('  |');
-  for x := 1 to N do begin
-    write(x:2,'|');
+  for i := 1 to how_many_times do begin
+    write('  |');
+    for x := 1 to N do begin
+      write(x:2, '|');
+    end;
+    if (i < how_many_times) then write(' ':width_between_areas);
   end;
   writeln;
-  writeln('  -------------------------------');
+  textcolor(normal_color);
+end;
+
+{ METHOD:HELPER: print_horizontal_border - wypisuje poziome kreski dla żądanej ilości tabel }
+procedure print_horizontal_border(how_many_times : integer);
+var i : integer;
+
+begin
+  textcolor(area_color);
+  for i := 1 to how_many_times do begin
+    write('  -------------------------------');
+    if (i < how_many_times) then write(' ':width_between_areas);
+  end;
+  writeln;
+  textcolor(normal_color);
+end;
+
+{ METHOD:HELPER: print_only_areas - wypisuje całe tablice bez nagłówków }
+procedure print_only_areas(how_many_areas : integer; plansze : areas);
+var
+  y : char;
+  x, i : integer;
+
+begin
+  textcolor(area_color);
   for y:= 'A' to M do begin
-    write(y:2,'|');
-    for x := 1 to N do begin
-      write(player1_ships_on_area[y][x], player1_ships_on_area[y][x],'|');
+    for i := 1 to how_many_areas do begin
+      write(y:2, '|');
+      for x := 1 to N do begin
+        write(plansze[i][y][x], plansze[i][y][x], '|');
+      end;
+      if (i < how_many_areas) then write(' ':width_between_areas);
     end;
     writeln;
-    writeln('  -------------------------------');
+    print_horizontal_border(how_many_areas);
   end;
   textcolor(normal_color);
+end;
+
+{ METHOD: print_area - rysowanie planszy gracza podczas dodawania statków }
+procedure print_area(plansza : area);
+var plansze : areas;
+
+begin
+  plansze[1] := player1_ships_on_area;
+  print_head_of_area(1); { nagłówek tabeli } 
+  print_horizontal_border(1); { podkreślenie nagłówka tabeli }
+  print_only_areas(1, plansze); { zawartość tabeli }
+end;
+
+{ METHOD: print_two_areas - rysuje dwie tabele obok siebie }
+procedure print_two_areas(plansza1 : area; plansza2 : area);
+var plansze : areas;
+
+begin
+  plansze[1] := plansza1;
+  plansze[2] := plansza2;
+  print_head_of_area(2); { wypisuje nagłówki +2+ tabel }
+  print_horizontal_border(2); { wypisuje poziome kreski dla +2+ tabel }
+  print_only_areas(2, plansze); { wypisuje tylko zawartość tabel + lewą kolumnę z literami }
 end;
 
 { METHOD: error_wrong_place_for_ship - wyświetlenie komunikatu, że statek nie może zostać tam umieszczony }
@@ -179,19 +232,23 @@ begin
 
   { ustawienie prostokąta dookoła statku, który trzeba sprawdzić, czy jest pusty }
   y_start := chr(ord(location.y) - 1); { poprzedni znak }
-  if (y_start < 'A') then y_start := 'A'; { przypadek, gdy statek styka się z górną krawędzią planszy }
-
-  y_stop := chr(ord(location.y) + 1); { następny znak }
-  if (y_stop > M) then y_stop := M; { przypadek, gdy statek styka się z dolną krawędzią planszy }
-
   x_start := location.x - 1;
-  if (x_start < 1) then x_start := 1; { przypadek, gdy statek styka się z lewą krawędzią planszy }
 
-  x_stop := location.x + length;
+  if (kierunek = pionowo) then begin { statek pionowo }
+    y_stop := chr(ord(location.y) + length);
+    x_stop := location.x + 1;
+  end else begin { statek poziomo }
+    y_stop := chr(ord(location.y) + 1);
+    x_stop := location.x + length;
+  end;
+
+  if (y_start < 'A') then y_start := 'A'; { przypadek, gdy statek styka się z górną krawędzią planszy }
+  if (x_start < 1) then x_start := 1; { przypadek, gdy statek styka się z lewą krawędzią planszy }
+  if (y_stop > M) then y_stop := M; { przypadek, gdy statek styka się z dolną krawędzią planszy }
   if(x_stop > N) then x_stop := N; { przypadek, gdy statek styka się z prawą krawędzia planszy }
 
   { sprawdzenie, czy wszystkie pola dookoła statku są wolne i czy pola pod statek też są wolne, i jeśli tak, to ich wypełnienie }
-  if(player = 1) then begin { ustalenie, na której planszy sprawdzać }
+  if(player = 1) then begin { ustalenie, na której planszy sprawdzać; pierwszy gracz }
     for y := y_start to y_stop do begin
       for x := x_start to x_stop do begin
         if (player1_ships_on_area[y][x] <> default_mark ) then begin { znak na polu jest różny od domyślnego (oznaczającego pole bez statku) }
@@ -211,7 +268,7 @@ begin
         player1_ships_on_area[location.y][x] := ship_mark;
       end;
     end;
-  end else begin
+  end else begin { drugi gracz }
     for y := y_start to y_stop do begin
       for x := x_start to x_stop do begin
         if (player2_ships_on_area[y][x] <> default_mark ) then begin { znak na polu jest różny od domyślnego (oznaczającego pole bez statku) }
@@ -284,7 +341,6 @@ var
 
 begin
   for i := 1 to 5 do begin { na sztywno ustawiona ilość statków - 5 }
-    randomize; { uruchomienie generatora liczb pseudolosowych }
     placed := 0; { false, nie udalo sie jeszcze umiescic statku }
     repeat { próbuje umieścić statek tak długo, aż mu się uda }
       { ustawienie pseudolosowo współrzędnych statku }
@@ -302,44 +358,13 @@ begin
   end;
 end;
 
-{ METHOD: new_game - rozpoczecie nowej gry. w zaleznosci od stanu beda rozne opcje }
-procedure new_game;
-begin
-  init_weights;
-  init_areas;
-  if (state = 1) then begin
-    set_player_ships
-  end else begin
-    set_cpu_ships(1)
-  end; { ustawienie na planszy pierwszego gracza (cpu w tym wypadku) statków }
-  set_cpu_ships(2); { ustawienie na planszy drugiego gracza (cpu) statków }
-end;
+procedure new_game; { uniknięcie zapętlenia }
+forward;
 
-procedure next_move;
-begin
-
-end;
-
-procedure break_game;
-begin
-
-end;
-
-{ BLOCK1: wypisywanie menu, akcji, powitania }
-
-{ METHOD: menu - wyswietlanie menu w zaleznosci od stanu programu }
-procedure menu;
-begin
-  textcolor(menu_color);
-  writeln('1. Nowa gra');
-  writeln('0. Zakończ');
-  textcolor(normal_color);
-end;
+{ BLOCK1: PART! }
 
 { METHOD: actions - wyswietlanie mozliwych akcji w zaleznosci od stanu programu:
-                    0 - wyswietla mozliwosc wyboru trybu gry
-                    1 - nastepny ruch i przerwanie rozgrywki
-                    2 - wykonaj ruch i przerwanie rozgrywki }
+                    0 - wyswietla mozliwosc wyboru trybu gry }
 procedure actions;
 begin
   textcolor(menu_color);
@@ -353,7 +378,55 @@ begin
       '2': state := 2;
     end;
     new_game;
+  end;
+  textcolor(normal_color);
+end;
+
+{ BLOCK3: PART! }
+
+{ METHOD: next_move - umożliwia graczowi wykonanie ruchu, następnie ruch wykonuje drugi gracz (komputer) i wówczas stan jest pokazywany }
+procedure next_move;
+begin
+  { player1 wykonuje ruch }
+  { player2 wykonuje ruch }
+  { rysuje tablice }
+  if (state = 1) then begin
+    print_two_areas(player1_ships_on_area, player1_shots_on_area);
   end else begin
+    print_two_areas(player1_ships_on_area, player2_ships_on_area);
+  end;
+end;
+
+{ METHOD: first_move - dokładnie to samo co next_move, tylko jeszcze na początku rysuje tabele }
+procedure first_move;
+begin
+  { rysuje tablice }
+  if (state = 1) then print_two_areas(player1_ships_on_area, player1_shots_on_area);
+  next_move;
+end;
+
+{ BLOCK1: PART! - wypisywanie menu podczas gry }
+
+{ METHOD: menu - wyswietlanie menu w zaleznosci od stanu programu }
+procedure menu;
+begin
+  textcolor(menu_color);
+  writeln('1. Nowa gra');
+  writeln('0. Zakończ');
+  textcolor(normal_color);
+
+  choice := readkey;
+  case choice of
+    '1': actions;
+    '0': halt;
+  end;
+end;
+
+{ METHOD: actions_game - wyświetla menu podczas trwania rozgrywki }
+procedure actions_game;
+begin
+  textcolor(action_color);
+  if (state <> 0) then begin
     if (state = 1) then begin
       writeln('1. Wykonaj ruch');
     end else begin
@@ -364,12 +437,35 @@ begin
     textcolor(input_color);
     choice := readkey;
     case choice of
-      '1': next_move;
-      '2': break_game;
+      '1': first_move;
+      '2': halt;{begin
+        state := 0;
+        clrscr;
+        menu;
+      end; }
     end;
   end;
   textcolor(normal_color);
 end;
+
+{ BLOCK3: PART! - funkcje dotyczace rozpoczynania, kontynuowania badz konczenia rozgrywki:
+          init_weights, init_areas, new_game, next_move, break_game, set_player_ships, place_ship }
+
+{ METHOD: new_game - rozpoczecie nowej gry. w zaleznosci od stanu beda rozne opcje }
+procedure new_game;
+begin
+  init_weights;
+  init_areas;
+  if (state = 1) then begin
+    set_player_ships
+  end else begin
+    set_cpu_ships(1)
+  end; { ustawienie na planszy pierwszego gracza (cpu w tym wypadku) statków }
+  set_cpu_ships(2); { ustawienie na planszy drugiego gracza (cpu) statków }
+  actions_game;
+end;
+
+{ BLOCK1: wypisywanie menu, akcji, powitania }
 
 { METHOD: powitanie - wyswietlanie powitania po uruchomieniu programu }
 procedure powitanie;
@@ -383,12 +479,8 @@ end;
 
 { BLOCK2: main program }
 begin
+  randomize; { uruchomienie generatora liczb pseudolosowych }
   state := 0;
   powitanie;
   menu;
-  choice := readkey;
-  case choice of
-    '1': actions;
-    '0': halt;
-  end;
 end.
