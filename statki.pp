@@ -208,7 +208,7 @@ begin
 end;
 
 { METHOD: init_hits - ustawienie ilości trafień we wrogie statki dla obu graczy na zero }
-procedure init_heats;
+procedure init_hits;
 begin
   player1_hits := 0;
   player2_hits := 0;
@@ -429,7 +429,6 @@ procedure shoot_player;
 var
   target : string;
   location : shot;
-  hit : integer; { czy został trafiony statek wroga? }
   shooted : integer; { czy udało się oddać strzał? }
 
 begin
@@ -438,7 +437,7 @@ begin
   repeat { próbuj strzelać, aż strzelisz w pole, w które nie strzelałeś jeszcze }
     readln(target);
     location := string_to_location(target);
-    if (player1_shots_on_area <> default_mark) then begin
+    if (player1_shots_on_area[location.y][location.x] <> default_mark) then begin
       error_dont_shoot_twice_the_same_place; { oddano już strzał w to miejsce }
     end else begin
       if (player2_ships_on_area[location.y][location.x] = ship_mark) then begin { trafiono statek }
@@ -448,7 +447,7 @@ begin
         inc(player1_hits); { zwiększa ilość trafień gracza }
       end else begin { spudłowano }
         player1_shots_on_area[location.y][location.x] := miss_mark; { w tablicy strzałów gracza ustawia znacznik pudła }
-        player2_ships_on_area[location.y[[location.x] := miss_mark; { w tablicy statków playera2 ustawia znacznik pudła }
+        player2_ships_on_area[location.y][location.x] := miss_mark; { w tablicy statków playera2 ustawia znacznik pudła }
         you_missed_the_ship;
       end;
       shooted := 1;
@@ -497,7 +496,7 @@ procedure next_move;
 var winner : integer;
 
 begin
-  if (state = 1) { ruch playera1 }
+  if (state = 1) then begin { ruch playera1 }
     shoot_player;
   end else begin
     shoot_cpu(1); { player1 jeśli jest cpu, to wykonuje ruch }
@@ -511,7 +510,8 @@ begin
   end;
 
   if (player1_hits >= win_if) or (player2_hits >= win_if) then begin { sprawdzenie, czy ktoś już wygrał }
-    winner := player1_hits >= player2_hits ? 1 : 2; { sprawdzenie, który gracz wygrał }
+    winner := 1; { założenie, że wygrał pierwszy gracz }
+    if (player2_hits > player1_hits) then winner := 2; { sprawdzenie, czy może jednak nie wygrał gracz drugi. Tak, brakuje operatora trójargumentowego. }
     someone_win_the_game(winner); { informacja o tym, że ktoś wygrał. parametr - numer gracza, ktory jest zwyciezca }
     state := 0;
     actions_game; { powrót do menu głównego poprzez metodę actions_game, żeby uniknąć niepotrzebnego forwardowania }
