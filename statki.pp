@@ -53,7 +53,7 @@ var
   player1_ships_on_area, player2_ships_on_area, player1_shots_on_area, player2_shots_on_area : area;
   player1_weights, player2_weights : area_of_weights; { akweny z podanymi wagami poszczególnych pól, one będą się zmieniać wraz z postępem rozgrywki }
   player1_max_weight, player2_max_weight : integer; { przechowują maksymalną wartość wagi na akwenie }
-
+  player1_hits, player2_hits : integer; { ilości trafień w statki przeciwników }
 
 { BLOCK1: PART! funkcje wypisujące różne rzeczy ;) }
 
@@ -177,7 +177,7 @@ begin
 end;
 
 { BLOCK3: funkcje dotyczace rozpoczynania, kontynuowania badz konczenia rozgrywki:
-          init_weights, init_areas, new_game, next_move, break_game, set_player_ships, place_ship }
+          init_weights, init_areas, init_hits, new_game, next_move, break_game, set_player_ships, place_ship }
 
 { METHOD: init_weights - początkowe wypełnienie akwenów wagami - do algorytmu wyboru pól do strzelania }
 procedure init_weights;
@@ -205,6 +205,13 @@ begin
       player2_shots_on_area[y][x] := default_mark;
     end;
   end;
+end;
+
+{ METHOD: init_hits - ustawienie ilości trafień we wrogie statki dla obu graczy na zero }
+procedure init_heats;
+begin
+  player1_hits := 0;
+  player2_hits := 0;
 end;
 
 { METHOD: place_ship - ustawia statek w wybranym miejscu (wsp + kierunek + długość) i zwraca 1 jeśli sie udało to zrobić lub 0 jeśli nie }
@@ -361,6 +368,107 @@ end;
 procedure new_game; { uniknięcie zapętlenia }
 forward;
 
+procedure actions_game; { again }
+forward;
+
+{ BLOCK1: PART! }
+
+{ METHOD: choose_location_action - metoda wyświetlająca komunikat tuż przed oddaniem strzału }
+procedure choose_location_action;
+begin
+  textcolor(action_color);
+  writeln('Podaj współrzędne, gdzie chcesz strzelić');
+  textcolor(normal_color);
+end;
+
+{ METHOD: error_dont_shoot_twice_the_same_place - metoda wyświetlająca komunikat o próbie ponownego strzału
+                                                  w to samo miejsce. }
+procedure error_dont_shoot_twice_the_same_place;
+begin
+  textcolor(error_color);
+  writeln('Już oddałeś strzał w to miejsce. Spróbuj w inne.');
+  textcolor(normal_color);
+end;
+
+{ METHOD: you_hit_the_ship - metoda wyświetlająca komunikat o trafieniu we wrogi okręt. }
+procedure you_hit_the_ship;
+begin
+  textcolor(greeting_color);
+  writeln('Trafiłeś wrogi okręt! Doskonale!');
+  textcolor(normal_color);
+end;
+
+{ METHOD: you_missed_the_ship - metoda wyświetlająca komunikat w przypadku spudłowania. }
+procedure you_missed_the_ship;
+begin
+  textcolor(greeting_color);
+  writeln('Niestety nie trafiłeś w żaden okręt.');
+  textcolor(normal_color);
+end;
+
+{ METHOD: someone_win_the_game - metoda wyświetlająca komunikat o zwycięstwie jednego z graczy. }
+procedure someone_win_the_game(player : integer);
+begin
+  textcolor(greeting_color);
+  if (state = 1) then begin
+    if (player = 1) then begin
+      writeln('Właśnie zniszczyłeś flotę przeciwnika! Gratulacje!');
+    end else begin
+      writeln('Niestety Twoja flota została zniszczona.');
+    end;
+  end else begin
+    writeln('Zwyciężył gracz nr ', player);
+  end;
+  textcolor(normal_color);
+end;
+
+{ BLOCK3: PART! }
+
+{ METHOD: shoot_player - metoda strzelająca :) zaznacza trafienie bądź pudło na odpowiednich tablicach obu playerów }
+procedure shoot_player;
+var
+  target : string;
+  location : shot;
+  hit : integer; { czy został trafiony statek wroga? }
+  shooted : integer; { czy udało się oddać strzał? }
+
+begin
+  choose_location_action;
+  shooted := 0; { nie został jeszcze oddany strzał w tej turze. }
+  repeat { próbuj strzelać, aż strzelisz w pole, w które nie strzelałeś jeszcze }
+    readln(target);
+    location := string_to_location(target);
+    if (player1_shots_on_area <> default_mark) then begin
+      error_dont_shoot_twice_the_same_place; { oddano już strzał w to miejsce }
+    end else begin
+      if (player2_ships_on_area[location.y][location.x] = ship_mark) then begin { trafiono statek }
+        player1_shots_on_area[location.y][location.x] := hit_mark; { w tablicy strzałów gracza ustawia znacznik trafienia }
+        player2_ships_on_area[location.y][location.x] := hit_mark; { w tablicy statków playera2 ustawia znacznik trafienia }
+        you_hit_the_ship;
+        inc(player1_hits); { zwiększa ilość trafień gracza }
+      end else begin { spudłowano }
+        player1_shots_on_area[location.y][location.x] := miss_mark; { w tablicy strzałów gracza ustawia znacznik pudła }
+        player2_ships_on_area[location.y[[location.x] := miss_mark; { w tablicy statków playera2 ustawia znacznik pudła }
+        you_missed_the_ship;
+      end;
+      shooted := 1;
+    end;
+  until(shooted = 1);
+end;
+
+{ METHOD: shoot_cpu - metoda, która umożliwia strzelanie komputerowi. Bazuje na wagach podczas wyboru miejsca oddania strzału. }
+procedure shoot_cpu(player : integer);
+var
+  location : shot;
+  hit : integer;
+  shooted : integer;
+  y : char;
+  x : integer;
+
+begin
+  
+end;
+
 { BLOCK1: PART! }
 
 { METHOD: actions - wyswietlanie mozliwych akcji w zaleznosci od stanu programu:
@@ -386,14 +494,29 @@ end;
 
 { METHOD: next_move - umożliwia graczowi wykonanie ruchu, następnie ruch wykonuje drugi gracz (komputer) i wówczas stan jest pokazywany }
 procedure next_move;
+var winner : integer;
+
 begin
-  { player1 wykonuje ruch }
-  { player2 wykonuje ruch }
-  { rysuje tablice }
-  if (state = 1) then begin
+  if (state = 1) { ruch playera1 }
+    shoot_player;
+  end else begin
+    shoot_cpu(1); { player1 jeśli jest cpu, to wykonuje ruch }
+  end;
+
+  shoot_cpu(2); { player2 wykonuje ruch }
+  if (state = 1) then begin { rysuje tablice }
     print_two_areas(player1_ships_on_area, player1_shots_on_area);
   end else begin
     print_two_areas(player1_ships_on_area, player2_ships_on_area);
+  end;
+
+  if (player1_hits >= win_if) or (player2_hits >= win_if) then begin { sprawdzenie, czy ktoś już wygrał }
+    winner := player1_hits >= player2_hits ? 1 : 2; { sprawdzenie, który gracz wygrał }
+    someone_win_the_game(winner); { informacja o tym, że ktoś wygrał. parametr - numer gracza, ktory jest zwyciezca }
+    state := 0;
+    actions_game; { powrót do menu głównego poprzez metodę actions_game, żeby uniknąć niepotrzebnego forwardowania }
+  end else begin
+    actions_game;
   end;
 end;
 
@@ -402,7 +525,7 @@ procedure first_move;
 begin
   { rysuje tablice }
   if (state = 1) then print_two_areas(player1_ships_on_area, player1_shots_on_area);
-  next_move;
+  next_move; { następny ruch }
 end;
 
 { BLOCK1: PART! - wypisywanie menu podczas gry }
@@ -438,12 +561,14 @@ begin
     choice := readkey;
     case choice of
       '1': first_move;
-      '2': halt;{begin
+      '2': begin
         state := 0;
         clrscr;
         menu;
-      end; }
+      end;
     end;
+  end else begin { przypadek, gdy gra się właśnie skończyła }
+    menu;
   end;
   textcolor(normal_color);
 end;
@@ -456,6 +581,7 @@ procedure new_game;
 begin
   init_weights;
   init_areas;
+  init_hits;
   if (state = 1) then begin
     set_player_ships
   end else begin
