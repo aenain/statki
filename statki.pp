@@ -12,6 +12,7 @@ type
   areas = array[1..2] of area;
   area_of_weights = array['A'..'J'] of array[1..10] of integer; { wagi na akwenie morskim }
   direction = (pionowo, poziomo); { wybór kierunku, w którym chcemy umieścić statek. Lewy górny róg statku będzie określany }
+  locations = array of shot;
 
 const
   N = 10; { rozmiar planszy, poki co na sztywno 10 }
@@ -53,7 +54,8 @@ var
   player1_ships_on_area, player2_ships_on_area, player1_shots_on_area, player2_shots_on_area : area;
   player1_weights, player2_weights : area_of_weights; { akweny z podanymi wagami poszczególnych pól, one będą się zmieniać wraz z postępem rozgrywki }
   player1_max_weight, player2_max_weight : integer; { przechowują maksymalną wartość wagi na akwenie }
-  player1_hits, player2_hits : integer; { ilości trafień w statki przeciwników }
+  player1_hits, player2_hits : locations; { dynamicznie alokowane tablice przechowujące kolejne trafienia }
+  player1_number_of_hits, player2_number_of_hits : integer; { ilości trafień w statki przeciwników }
 
 { BLOCK1: PART! funkcje wypisujące różne rzeczy ;) }
 
@@ -210,8 +212,8 @@ end;
 { METHOD: init_hits - ustawienie ilości trafień we wrogie statki dla obu graczy na zero }
 procedure init_hits;
 begin
-  player1_hits := 0;
-  player2_hits := 0;
+  player1_number_of_hits := 0;
+  player2_number_of_hits := 0;
 end;
 
 { METHOD: place_ship - ustawia statek w wybranym miejscu (wsp + kierunek + długość) i zwraca 1 jeśli sie udało to zrobić lub 0 jeśli nie }
@@ -444,7 +446,9 @@ begin
         player1_shots_on_area[location.y][location.x] := hit_mark; { w tablicy strzałów gracza ustawia znacznik trafienia }
         player2_ships_on_area[location.y][location.x] := hit_mark; { w tablicy statków playera2 ustawia znacznik trafienia }
         you_hit_the_ship;
-        inc(player1_hits); { zwiększa ilość trafień gracza }
+        inc(player1_number_of_hits); { zwiększa ilość trafień gracza }
+        setlength(player1_hits, player1_number_of_hits); { zmienia rozmiar tablicy przechowującej trafienia gracza }
+        player1_hits[player1_number_of_hits] := location; { dodaje do tablicy trafień ostatnie trafienie gracza }
       end else begin { spudłowano }
         player1_shots_on_area[location.y][location.x] := miss_mark; { w tablicy strzałów gracza ustawia znacznik pudła }
         player2_ships_on_area[location.y][location.x] := miss_mark; { w tablicy statków playera2 ustawia znacznik pudła }
@@ -455,17 +459,76 @@ begin
   until(shooted = 1);
 end;
 
+{ METHOD: update_weights - metoda, która aktualizuje wagi w tablicy danego playera w zależności od ostatniego strzału i jego powodzenia }
+procedure update_weights(player : integer; location : shot; skutek : string);
+begin
+  
+end;
+
 { METHOD: shoot_cpu - metoda, która umożliwia strzelanie komputerowi. Bazuje na wagach podczas wyboru miejsca oddania strzału. }
 procedure shoot_cpu(player : integer);
 var
   location : shot;
-  hit : integer;
-  shooted : integer;
   y : char;
-  x : integer;
+  x, i : integer;
+  best_locations : locations; { tablica lokalizacji o najwyższych wagach }
+  weights : area_of_weights; { plansza wypełniona wagami. Zostaje jej przypisana tablica z wagami wybranego gracza }
+  max_weight : integer; { zostaje jej przypisana największa waga z tablicy wag danego gracza }
+  count_locations : integer; { ilość lokalizacji o najwyższej wadze }
 
 begin
-  
+  count_locations := 1; { co najmniej jedna lokalizacja będzie mieć wagę większą niż zero, zawsze! }
+
+  if (player = 1) then begin { przypisanie odpowiednich zmiennych w zależności od tego, do którego gracza mają się odnosić }
+    max_weight := player1_max_weight;
+    weights := player1_weights;
+  end else begin
+    max_weight := player2_max_weight;
+    weights := player2_weights;
+  end;
+
+  for y := 'A' to M do begin { wybranie najlepszych lokalizacji dla danego gracza na podstawie jego tablicy wag }
+    for x:= 1 to N do begin
+      if (weights[y][x] = max_weight) then begin
+        setlength(best_locations, count_locations);
+        location.y := y;
+        location.x := x;
+        best_locations[count_locations] := location;
+        inc(count_locations);
+      end;
+    end;
+  end;
+
+  i := 1 + random(count_locations); { losowe wybranie indeksu jednego z kilku miejsc najlepszych do strzelania }
+  location := best_locations[i]; { tam będziemy strzelać }
+
+  if (player = 1) then begin { strzelał pierwszy gracz }
+    if (player2_ships_on_area[location.y][location.x] = ship_mark) then begin { trafienie statku należącego do drugiego gracza }
+      player2_ships_on_area[location.y][location.x] := hit_mark; { przypisanie trafienia }
+      player1_shots_on_area[location.y][location.x] := hit_mark;
+      inc(player1_number_of_hits); { zwiększenie liczby trafień playera1 }
+      setlength(player1_hits, player1_number_of_hits); { zwiększenie rozmiaru tablicy trafień playera1 }
+      player1_hits[player1_number_of_hits] := location; { dodanie ostatniego trafienia do tablicy trafień playera1 }
+      update_weights(1, location, 'hit'); { aktualizacja wag w tablicy playera1, ostatni parametr oznacza trafienie }
+    end else begin { pudło pierwszego gracza }
+      player2_ships_on_area[location.y][location.x] := miss_mark; { przypisanie pudła }
+      player1_shots_on_area[location.y][location.x] := miss_mark;
+      update_weights(1, location, 'miss'); { aktualizacja wag w tablicy playera1, ostatni parametr oznacza pudło }
+    end;
+  end else begin { strzelał drugi gracz }
+    if (player1_ships_on_area[location.y][location.x] = ship_mark) then begin { trafienie statku należącego do pierwszego gracza }
+      player1_ships_on_area[location.y][location.x] := hit_mark; { przypisanie trafienia }
+      player2_shots_on_area[location.y][location.x] := hit_mark;
+      inc(player2_number_of_hits); { zwiększenie liczby trafień playera2 }
+      setlength(player2_hits, player2_number_of_hits); { zwiększenie rozmiaru tablicy trafień playera2 }
+      player2_hits[player2_number_of_hits] := location; { dodanie ostatniego trafienia do tablicy trafień playera2 }
+      update_weights(2, location, 'hit'); { aktualizacja wag w tablicy playera2, ostatni parametr oznacza trafienie }
+    end else begin { pudło drugiego gracza }
+      player1_ships_on_area[location.y][location.x] := miss_mark; { przypisanie pudła }
+      player2_shots_on_area[location.y][location.x] := miss_mark;
+      update_weights(2, location, 'miss'); { aktualizacja wag w tablicy playera2, ostatni parametr oznacza pudło }
+    end;
+  end;
 end;
 
 { BLOCK1: PART! }
@@ -509,9 +572,9 @@ begin
     print_two_areas(player1_ships_on_area, player2_ships_on_area);
   end;
 
-  if (player1_hits >= win_if) or (player2_hits >= win_if) then begin { sprawdzenie, czy ktoś już wygrał }
+  if (player1_number_of_hits >= win_if) or (player2_number_of_hits >= win_if) then begin { sprawdzenie, czy ktoś już wygrał }
     winner := 1; { założenie, że wygrał pierwszy gracz }
-    if (player2_hits > player1_hits) then winner := 2; { sprawdzenie, czy może jednak nie wygrał gracz drugi. Tak, brakuje operatora trójargumentowego. }
+    if (player2_number_of_hits > player1_number_of_hits) then winner := 2; { sprawdzenie, czy może jednak nie wygrał gracz drugi. Tak, brakuje operatora trójargumentowego. }
     someone_win_the_game(winner); { informacja o tym, że ktoś wygrał. parametr - numer gracza, ktory jest zwyciezca }
     state := 0;
     actions_game; { powrót do menu głównego poprzez metodę actions_game, żeby uniknąć niepotrzebnego forwardowania }
