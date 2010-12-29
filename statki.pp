@@ -9,6 +9,7 @@ type
   end;
 
   area = array['A'..'J'] of array[1..10] of char; { akwen morski :) }
+  area_of_weights = array['A'..'J'] of array[1..10] of integer; { wagi na akwenie morskim }
 
 const
   N = 10; { rozmiar planszy, poki co na sztywno 10 }
@@ -18,7 +19,21 @@ const
   action_color = 7; { 7 - jasnoszary }
   greeting_color = 14; { 14 - żółty }
   ships : array[1..5] of integer = (5,4,3,3,2); { możliwe statki do wyboru }
-  win_if = 17; { wygrana, gdy trafi wszystkie statki, inaczej: suma długości statków }
+  win_if = 17; { wygrana, gdy trafi wszystkie statki, inaczej: suma długości statków, poki co na sztywno 17 }
+  ship_mark = '@'; { znacznik statku na planszy }
+  hit_mark = 'x'; { znacznik trafienia na planszy }
+  miss_mark = 'o'; { znacznik pudła na planszy }
+  weights : array[1..5] of integer = (0,1,2,3,4); { wagi pól, czyli gdzie najlepiej strzelać, 0 - na pewno nie ma statków, im więcej, tym lepiej! }
+  initial_weights : area_of_weights = ((1,1,1,1,1,1,1,1,1,1),
+                                       (1,1,1,1,1,1,1,1,1,1),
+                                       (1,1,1,1,1,1,1,1,1,1),
+                                       (1,1,1,1,1,1,1,1,1,1),
+                                       (1,1,1,1,1,1,1,1,1,1),
+                                       (1,1,1,1,1,1,1,1,1,1),
+                                       (1,1,1,1,1,1,1,1,1,1),
+                                       (1,1,1,1,1,1,1,1,1,1),
+                                       (1,1,1,1,1,1,1,1,1,1),
+                                       (1,1,1,1,1,1,1,1,1,1)); { początkowe wagi pól akwenu, czyli gdzie najczęściej są statki }
 
 var
   state : integer; { stan programu: 0 - brak rozgrywki, 1 - gracz vs cpu, 2 - cpu vs cpu }
@@ -29,8 +44,39 @@ var
     ships_on_area - plansza widziana przez danego gracza z jego własnymi statkami i strzałami przeciwnika.
     shots_on_area - plansza widziana przez danego gracza z jego własnymi strzałami }
   player1_ships_on_area, player2_ships_on_area, player1_shots_on_area, player2_shots_on_area : area;
+  player1_weights, player2_weights : area_of_weights; { akweny z podanymi wagami poszczególnych pól, one będą się zmieniać wraz z postępem rozgrywki }
 
-{ BLOCK1: wypisywanie menu, akcji, powitania } 
+{ BLOCK3: funkcje dotyczace rozpoczynania, kontynuowania badz konczenia rozgrywki:
+          init_weights, new_game, next_move, break_game }
+
+{ METHOD: init_weights - początkowe wypełnienie akwenów wagami - do algorytmu wyboru pól do strzelania }
+procedure init_weights;
+var
+  y : char;
+  x : integer;
+
+begin
+  if (state = 2) then begin player1_weights := initial_weights end;
+  player2_weights := initial_weights;
+end;
+
+{ METHOD: new_game - rozpoczecie nowej gry. w zaleznosci od stanu beda rozne opcje }
+procedure new_game;
+begin
+  
+end;
+
+procedure next_move;
+begin
+
+end;
+
+procedure break_game;
+begin
+
+end;
+
+{ BLOCK1: wypisywanie menu, akcji, powitania }
 { METHOD: menu - wyswietlanie menu w zaleznosci od stanu programu }
 procedure menu;
 begin
@@ -52,7 +98,7 @@ begin
     writeln('2. Komputer vs Komputer');
     textcolor(input_color);
     choice := readkey;
-    case choise of
+    case choice of
       '1': state := 1;
       '2': state := 2;
     end;
@@ -67,7 +113,7 @@ begin
     writeln('2. Przerwij rozgrywkę');
     textcolor(input_color);
     choice := readkey;
-    case choise of
+    case choice of
       '1': next_move;
       '2': break_game;
     end;
@@ -85,15 +131,6 @@ begin
   textcolor(normal_color);
 end;
 
-{ BLOCK3: funkcje dotyczace rozpoczynania, kontynuowania badz konczenia rozgrywki:
-          new_game, next_move, break_game }
-
-{ METHOD: new_game - rozpoczecie nowej gry. w zaleznosci od stanu beda rozne opcje }
-procedure new_game;
-begin
-  
-end;
-
 { BLOCK2: main program }
 begin
   state := 0;
@@ -103,5 +140,5 @@ begin
   case choice of
     '1': actions;
     '0': halt;
-  end;  ships : array[1..5] of integer = (5,4,3,3,2); { możliwe statki do wyboru }
+  end;
 end.
