@@ -605,13 +605,13 @@ begin
         if (weights[y][x] = max_weight) then begin
           location.y := y;
           location.x := x;
-          best_locations[count_locations] := location;
           inc(count_locations);
+          best_locations[count_locations] := location;
         end;
       end;
     end;
 
-    if(count_locations = 0) then begin
+    if(count_locations = 0) then begin { nie znaleziono żadnych pól o zadanej wadze }
       if (player = 1) then begin
         dec(player1_max_weight);
         max_weight := player1_max_weight;
@@ -622,7 +622,6 @@ begin
     end;
 
   until(count_locations > 0);
-  
 
   i := 1 + random(count_locations); { losowe wybranie indeksu jednego z kilku miejsc najlepszych do strzelania }
   location := best_locations[i]; { tam będziemy strzelać }
