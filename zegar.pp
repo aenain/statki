@@ -3,12 +3,18 @@ program zegar;
 uses dos, crt, math;
 
 type
-  date = record { rekord do obsługi daty }
+  date = object { obiekt do obsługi daty }
     year, month, day, wday : word; { wday - day of week (0 - niedziela) }
+    function name_of_month:string;
+    function name_of_day:string;
+    procedure set_current;
   end;
 
-  time = record { rekord do obsługi czasu }
-    hours, minutes, seconds, cseconds : word; { cseconds - setne sekundy }
+  time = object { obiekt do obsługi czasu }
+    hours, minutes, seconds, cs : word; { cs - setne sekundy }
+    function to_period:longint; { zwraca, ile upłynęło setnych sekund od początku dnia }
+    procedure to_time(period:longint); { ustawia wszystkie zmienne obiektu tak, by reprezentowały daną godzinę z liczby setnych sekundy }
+    procedure set_current;
   end;
 
   position = record { rekord do obsługi położenia, używany do ustawienia kursora przed wypisywaniem na ekran w gotoxy(x,y) }
@@ -26,42 +32,74 @@ const
   error_color = 4; { 4 - czerwony }
   info_color = 15; { 15 - biały }
   description_color = 7; { 7 - jasnoszary }
+
+var
+  data : date; { rekord daty }
+  czas : time; { rekord czasu }
+  year, month, day, wday : word; { składniki daty, wday - dzien tygodnia: 0 - niedziela }
+  hours, minutes, seconds, cseconds : word; { składniki czasu, cseconds - setne sekundy }
+  period : longint; { liczba reprezentująca czas jako ilość setnych sekundy, które upłynęły od początku dnia }
+  stopwatch_position : position; { określenie pozycji stopera }
+
+{ BLOCK4: SUPPORT - blok odpowiedzialny za pomoc modelowi w obsłudze czasu, daty, plików }
+
+{ METHOD: to_period - wywołana na obiekcie time zwraca ilość setnych sekundy od początku dnia }
+function time.to_period:longint;
+begin
+  to_period := ((self.hours * 60 + self.minutes) * 60 + self.seconds) * 100 + self.cs;
+end;
+
+{ METHOD: to_time - wywołana na obiekcie time ustawia wszystkie zmienne (hours, minutes, seconds, cs) tak, by time reprezentował
+  czas równy +period+ setnych sekundy od początku dnia }
+procedure time.to_time(period : longint);
+begin
+  self.cs := period mod 100;
+  period := period div 100;
+
+  self.seconds := period mod 60;
+  period := period div 60;
+
+  self.minutes := period mod 60;
+  period := period div 60;
+
+  self.hours := period;
+end;
+
+{ METHOD: set_current_time - metoda ustawia aktualny czas jako wartość zmiennej current_time }
+procedure time.set_current;
+begin
+  gettime(self.hours, self.minutes, self.seconds, self.cs);
+end;
+
+{ METHOD: name_of_month - wywołana na obiekcie date zwraca odmienioną nazwę miesiąca (np. "stycznia"), która się nadaje do wstawienia między dzień a rok }
+function date.name_of_month:string;
+var
   { nazwy miesięcy, które trafią między dzień a rok - czyli odmienione }
   names_of_months : array[1..12] of string = ('stycznia', 'lutego', 'marca', 'kwietnia',
                                                'maja', 'czerwca', 'lipca', 'sierpnia',
                                                'września', 'października', 'listopada', 'grudnia');
+
+begin
+  name_of_month := names_of_months[self.month];
+end;
+
+{ METHOD: name_of_day - wywołana na obiekcie date zwraca nazwę dnia tygodnia }
+function date.name_of_day:string;
+var
   { nazwy dni tygodnia }
   names_of_days : array[0..6] of string = ('niedziela', 'poniedziałek', 'wtorek', 'środa', 'czwartek', 'piątek', 'sobota');
 
-var
-  current_date : date; { rekord daty }
-  current_time : time; { rekord czasu }
-  year, month, day, wday : word; { składniki daty, wday - dzien tygodnia: 0 - niedziela }
-  hours, minutes, seconds, cseconds : word; { składniki czasu, cseconds - setne sekundy }
-  period : longint;
-  stopwatch_position : position; { określenie pozycji stopera }
-
-{ BLOCK2: CONTROLLER - blok odpowiedzialny za obliczenia }
+begin
+  name_of_day := names_of_days[self.wday];
+end;
 
 { METHOD: set_current_date - metoda ustawia aktualną datę jako wartość zmiennej current_date }
-procedure set_current_date;
+procedure date.set_current;
 begin
-  getdate(year, month, day, wday);
-  current_date.year := year;
-  current_date.month := month;
-  current_date.day := day;
-  current_date.wday := wday;
+  getdate(self.year, self.month, self.day, self.wday);
 end;
 
-{ METHOD: set_current_time - metoda ustawia aktualny czas jako wartość zmiennej current_time }
-procedure set_current_time;
-begin
-  gettime(hours, minutes, seconds, cseconds);
-  current_time.hours := hours;
-  current_time.minutes := minutes;
-  current_time.seconds := seconds;
-  current_time.cseconds := cseconds;
-end;
+{ BLOCK2: CONTROLLER - blok odpowiedzialny za obliczenia }
 
 { METHOD: add_zero_if_smaller_than_ten - metoda zwracająca string podany jako argument z dodanym zerem, jeśli wartość stringa była mniejsza niż 10 }
 function add_zero_if_smaller_than_ten(str : string):string;
@@ -77,66 +115,33 @@ end;
 { METHOD: parse_date_to_readable_form - metoda zwracająca datę w postaci np. "1 stycznia 1970r." }
 function parse_date_to_readable_form(date : date):string;
 var
-  readable : string;
   str_day, str_year : string;
 
 begin
   str(date.day, str_day);
   str(date.year, str_year);
-  readable := str_day + ' ' + names_of_months[date.month] + ' ' + str_year + 'r.';
 
-  parse_date_to_readable_form := readable;
+  parse_date_to_readable_form := str_day + ' ' + date.name_of_month + ' ' + str_year + 'r.';
 end;
 
 { METHOD: parse_time_to_readable_form - metoda zwracająca czas w postaci np. "00:01:10" lub "00:01:10.99" w zależności od parametru precision:
   false - ograniczenie do sekund; true - dokładny czas (wraz z centysekundami) }
 function parse_time_to_readable_form(time : time; precision : boolean):string;
 var
-  readable : string;
-  str_hours, str_minutes, str_seconds, str_cseconds : string;
+  readable, str_hours, str_minutes, str_seconds, str_cs : string;
 
 begin
   str(time.hours, str_hours);
   str(time.minutes, str_minutes);
   str(time.seconds, str_seconds);
-  str(time.cseconds, str_cseconds);
+  str(time.cs, str_cs);
+
   readable := add_zero_if_smaller_than_ten(str_hours) + ':';
   readable += add_zero_if_smaller_than_ten(str_minutes) + ':';
   readable += add_zero_if_smaller_than_ten(str_seconds);
-  if (precision) then readable += '.' + add_zero_if_smaller_than_ten(str_cseconds);
+  if (precision) then readable += '.' + add_zero_if_smaller_than_ten(str_cs);
 
   parse_time_to_readable_form := readable;
-end;
-
-{ METHOD: parse_time_to_sceconds - metoda zwracająca liczbę centysekund, jakie upłynęły od początku dnia }
-function parse_time_to_cseconds(time : time):longint;
-var
-  time_to_period : longint;
-
-begin
-  time_to_period := time.cseconds;
-  time_to_period += time.seconds * 100;
-  time_to_period += time.minutes * 100 * 60;
-  time_to_period += time.hours * 100 * 60 * 60;
-
-  parse_time_to_cseconds := time_to_period;
-end;
-
-{ METHOD: parse_cseconds_to_time - metoda zwracająca rekord czasu utworzony z liczby centysekund }
-function parse_cseconds_to_time(period : longint):time;
-var
-  period_to_time : time;
-
-begin
-  period_to_time.cseconds := period mod 100;
-  period := period div 100;
-  period_to_time.seconds := period mod 60;
-  period := period div 60;
-  period_to_time.minutes := period mod 60;
-  period := period div 60;
-  period_to_time.hours := period;
-
-  parse_cseconds_to_time := period_to_time;
 end;
 
 procedure print_exact_time(time : time);
@@ -152,24 +157,19 @@ forward;
 procedure stopwatch;
 var
   start, stop, duration : time;
-  int_start, period : longint;
 
 begin
   clrscr;
 
-  set_current_time;
-  start := current_time;
-  int_start := parse_time_to_cseconds(start);
+  start.set_current;
 
   repeat
-    set_current_time;
-    period := parse_time_to_cseconds(current_time) - int_start;
-    duration := parse_cseconds_to_time(period);
+    stop.set_current;
+    duration.to_time(stop.to_period - start.to_period);
     print_stopwatch(duration);
     delay(1);
   until keypressed;
 
-  stop := current_time;
   print_start_stop_and_difference_time(start, stop, duration);
 end;
 
@@ -188,27 +188,37 @@ end;
 { METHOD: print_current_date - metoda wyświetlająca aktualną datę w normalnej postaci,
   UWAGA! data musi zostać wcześniej ustawiona! }
 procedure print_current_date;
+var
+  data : date;
+
 begin
   textcolor(info_color);
-  writeln('Dziś jest ', parse_date_to_readable_form(current_date));
+  data.set_current;
+  writeln('Dziś jest ', parse_date_to_readable_form(data));
   textcolor(normal_color);
 end;
 
-{ METHOD: print_current_date_and_wday - metoda wyświetlająca aktualną datę wraz z dniem tygodnia w normalnej postaci,
-  UWAGA! data musi zostać wcześniej ustawiona! }
+{ METHOD: print_current_date_and_wday - metoda wyświetlająca aktualną datę wraz z dniem tygodnia w normalnej postaci }
 procedure print_current_date_and_wday;
+var
+  data : date;
+
 begin
   textcolor(info_color);
-  writeln('Dziś jest ', names_of_days[current_date.wday], ' ', parse_date_to_readable_form(current_date));
+  data.set_current;
+  writeln('Dziś jest ', data.name_of_day, ' ', parse_date_to_readable_form(data));
   textcolor(normal_color);
 end;
 
-{ METHOD: print_current_time - metoda wyświetlająca aktualny czas,
-  UWAGA! czas musi zostać wcześniej ustawiony! }
+{ METHOD: print_current_time - metoda wyświetlająca aktualny czas }
 procedure print_current_time;
+var
+  czas : time;
+
 begin
   textcolor(info_color);
-  writeln('Godzina: ', parse_time_to_readable_form(current_time, false));
+  czas.set_current;
+  writeln('Godzina: ', parse_time_to_readable_form(czas, false));
   textcolor(normal_color);
 end;
 
@@ -252,13 +262,17 @@ begin
   stopwatch_position.y := 2;
 end;
 
+procedure get_events_on_today;
+begin
+
+end;
+
 begin
   init_positions_of_elements;
   greeting;
-  set_current_date;
   print_current_date_and_wday;
-  set_current_time;
   print_current_time;
-  print_exact_time(current_time);
+  czas.set_current;
+  print_exact_time(czas);
   stopwatch;
 end.
