@@ -25,6 +25,7 @@ const
   greeting_color = 14; { 14 - żółty }
   error_color = 4; { 4 - czerwony }
   info_color = 15; { 15 - biały }
+  description_color = 7; { 7 - jasnoszary }
   { nazwy miesięcy, które trafią między dzień a rok - czyli odmienione }
   names_of_months : array[1..12] of string = ('stycznia', 'lutego', 'marca', 'kwietnia',
                                                'maja', 'czerwca', 'lipca', 'sierpnia',
@@ -222,11 +223,13 @@ end;
 { METHOD: print_start_stop_and_difference_time - metoda wyświetlająca wyniki działania stopera }
 procedure print_start_stop_and_difference_time(start : time; stop : time; duration : time);
 begin
-  textcolor(info_color);
+  textcolor(description_color);
   write('Start o godzinie: ');
   print_exact_time(start);
+  textcolor(description_color);
   write('Stop o godzinie:  ');
   print_exact_time(stop);
+  textcolor(description_color);
   write('Upłynęło:         ');
   print_exact_time(duration);
   textcolor(normal_color);
@@ -245,8 +248,8 @@ end;
 procedure init_positions_of_elements;
 begin
   { stoper }
-  stopwatch_position.x := 1;
-  stopwatch_position.y := 1;
+  stopwatch_position.x := 3;
+  stopwatch_position.y := 2;
 end;
 
 begin
