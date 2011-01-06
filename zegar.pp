@@ -1,0 +1,5 @@
+program zegar;
+
+begin
+
+end.
