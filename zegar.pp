@@ -1,6 +1,6 @@
 program zegar;
 
-uses dos, crt;
+uses dos, crt, math;
 
 type
   date = record { rekord do obsługi daty }
@@ -9,6 +9,11 @@ type
 
   time = record { rekord do obsługi czasu }
     hours, minutes, seconds, cseconds : word; { cseconds - setne sekundy }
+  end;
+
+  position = record { rekord do obsługi położenia, używany do ustawienia kursora przed wypisywaniem na ekran w gotoxy(x,y) }
+    x : word;
+    y : word;
   end;
 
 const
@@ -32,6 +37,8 @@ var
   current_time : time; { rekord czasu }
   year, month, day, wday : word; { składniki daty, wday - dzien tygodnia: 0 - niedziela }
   hours, minutes, seconds, cseconds : word; { składniki czasu, cseconds - setne sekundy }
+  period : longint;
+  stopwatch_position : position; { określenie pozycji stopera }
 
 { BLOCK2: CONTROLLER - blok odpowiedzialny za obliczenia }
 
@@ -100,6 +107,71 @@ begin
   parse_time_to_readable_form := readable;
 end;
 
+{ METHOD: parse_time_to_sceconds - metoda zwracająca liczbę centysekund, jakie upłynęły od początku dnia }
+function parse_time_to_cseconds(time : time):longint;
+var
+  time_to_period : longint;
+
+begin
+  time_to_period := time.cseconds;
+  time_to_period += time.seconds * 100;
+  time_to_period += time.minutes * 100 * 60;
+  time_to_period += time.hours * 100 * 60 * 60;
+
+  parse_time_to_cseconds := time_to_period;
+end;
+
+{ METHOD: parse_cseconds_to_time - metoda zwracająca rekord czasu utworzony z liczby centysekund }
+function parse_cseconds_to_time(period : longint):time;
+var
+  period_to_time : time;
+
+begin
+  period_to_time.cseconds := period mod 100;
+  period := period div 100;
+  period_to_time.seconds := period mod 60;
+  period := period div 60;
+  period_to_time.minutes := period mod 60;
+  period := period div 60;
+  period_to_time.hours := period;
+
+  parse_cseconds_to_time := period_to_time;
+end;
+
+procedure print_exact_time(time : time);
+forward;
+
+procedure print_start_stop_and_difference_time(start : time; stop : time; duration : time);
+forward;
+
+procedure print_stopwatch(duration : time);
+forward;
+
+{ METHOD: stopwatch - metoda obsługująca stoper, czyli liczenie czasu między dwoma punktami }
+procedure stopwatch;
+var
+  start, stop, duration : time;
+  int_start, period : longint;
+
+begin
+  clrscr;
+
+  set_current_time;
+  start := current_time;
+  int_start := parse_time_to_cseconds(start);
+
+  repeat
+    set_current_time;
+    period := parse_time_to_cseconds(current_time) - int_start;
+    duration := parse_cseconds_to_time(period);
+    print_stopwatch(duration);
+    delay(1);
+  until keypressed;
+
+  stop := current_time;
+  print_start_stop_and_difference_time(start, stop, duration);
+end;
+
 { BLOCK1: VIEW - blok odpowiedzialny za wyświetlanie wyników działania programu }
 
 { METHOD: greeting - metoda wyświetlająca informację powitalną podczas startu programu }
@@ -139,10 +211,51 @@ begin
   textcolor(normal_color);
 end;
 
+{ METHOD: HELPER: print_exact_time - metoda wyświetlająca podany czas jako czas dokładny (z centysekundami) }
+procedure print_exact_time(time : time);
 begin
+  textcolor(info_color);
+  writeln(parse_time_to_readable_form(time, true));
+  textcolor(normal_color);
+end;
+
+{ METHOD: print_start_stop_and_difference_time - metoda wyświetlająca wyniki działania stopera }
+procedure print_start_stop_and_difference_time(start : time; stop : time; duration : time);
+begin
+  textcolor(info_color);
+  write('Start o godzinie: ');
+  print_exact_time(start);
+  write('Stop o godzinie:  ');
+  print_exact_time(stop);
+  write('Upłynęło:         ');
+  print_exact_time(duration);
+  textcolor(normal_color);
+end;
+
+{ METHOD: print_stopwatch - metoda wyświetlająca stoper w określonym miejscu }
+procedure print_stopwatch(duration : time);
+begin
+  gotoxy(stopwatch_position.x, stopwatch_position.y);
+  print_exact_time(duration);
+end;
+
+{ BLOCK 3: MODEL - ustawienia pozycji elementów, ścieżki do pliku z danymi itd. }
+
+{ METHOD: init_positions_of_elements - ustawienie pozycji wszystkich elementów używanych w programie, aby można było wykorzystać gotoxy(x,y) }
+procedure init_positions_of_elements;
+begin
+  { stoper }
+  stopwatch_position.x := 1;
+  stopwatch_position.y := 1;
+end;
+
+begin
+  init_positions_of_elements;
   greeting;
   set_current_date;
   print_current_date_and_wday;
   set_current_time;
   print_current_time;
+  print_exact_time(current_time);
+  stopwatch;
 end.
