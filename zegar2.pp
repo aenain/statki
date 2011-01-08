@@ -1,0 +1,5 @@
+program ZegarZBudzikiem;
+
+begin
+
+end.
