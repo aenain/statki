@@ -10,8 +10,9 @@ type
       year, month, day, wday : word;
       function to_s(with_name_of_month : boolean = false; with_name_of_year : boolean = false; with_name_of_day : boolean = false) : string;
       procedure set_current;
-      procedure to_date(const sequence : string); { z wykorzystaniem str postaci [dd.mm.yyyy] }
+      procedure to_date(sequence : string); { z wykorzystaniem str postaci [dd.mm.yyyy] }
       procedure calculate_wday; { na podstawie dnia, miesiąca i roku oblicza dzień tygodnia i ustawia wday }
+      constructor create;
 
     private
       function name_of_month : string;
@@ -37,7 +38,7 @@ begin
   if(with_name_of_year) then to_s := to_s + ' r.';
 end;
 
-procedure tdate.to_date(const sequence : string);
+procedure tdate.to_date(sequence : string);
 begin
   val(sequence[1..2], self.day);
   val(sequence[4..5], self.month);
@@ -98,6 +99,14 @@ begin
   str(variable, str_variable);
   if (variable < 10) then str_variable := '0' + str_variable;
   add_0_if_less_than_10 := str_variable;
+end;
+
+constructor tdate.create; { init values }
+begin
+  self.year := 1970;
+  self.month := 1;
+  self.day := 1;
+  self.wday := self.calculate_wday;
 end;
 
 end.

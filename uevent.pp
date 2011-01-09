@@ -70,6 +70,9 @@ constructor tevent.create;
 begin
   self.start := tdatetime.create;
   self.finish := tdatetime.create;
+  self.anniversary := false; { just in case. }
+  self.all_day := false;
+  self.name := 'nazwa';
 end;
 
 end.

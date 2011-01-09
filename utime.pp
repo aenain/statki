@@ -10,9 +10,10 @@ type
       hours, minutes, seconds, cs : word;
       function to_s(with_seconds : boolean = false; with_cs : boolean = false; with_prepend_text : boolean = false) : string;
       procedure to_time(period : longint); overload;
-      procedure to_time(const sequence : string); overload;
+      procedure to_time(sequence : string); overload;
       function to_period : longint; { TODO! napisać metodę zamieniająca time na longint (ilość centysekund, które upłynęły od początku dnia }
       procedure set_current;
+      constructor create;
 
     private
       function add_0_if_less_than_10(const variable : word) : string;
@@ -44,7 +45,7 @@ begin
   self.hours := period;
 end;
 
-procedure ttime.to_time(const sequence : string);
+procedure ttime.to_time(sequence : string);
 begin
   val(sequence[1..2], self.hours);
   val(sequence[4..5], self.minutes);
@@ -74,6 +75,14 @@ begin
   str(variable, str_variable);
   if (variable < 10) then str_variable := '0' + str_variable;
   add_0_if_less_than_10 := str_variable;
+end;
+
+constructor ttime.create; { init values }
+begin
+  self.hours := 0;
+  self.minutes := 0;
+  self.seconds := 0;
+  self.cs := 0;
 end;
 
 end.

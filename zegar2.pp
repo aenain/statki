@@ -32,16 +32,22 @@ begin
   event := tevent.create;
   event.name := 'Urodziny Mariana';
   event.all_day := true;
+  event.anniversary := true;
   event.start.date.to_date('02.01.2011');
   event.finish.date.to_date('02.01.2011');
   event.start.time.to_time(0);
   event.finish.time.to_time(24 * 3600 * 100 - 1);
 
   { input := tinput.create(2, 4); }
-  { menu := tmenu.create; }
+  menu := tmenu.create;
+  menu.event.add;
   { menu.event.index; }
   database := tfile.create;
-  {database.add(event);}
+   {database.add(event);}
+  { events := database.index; }
   events := database.index;
-  writeln(low(events),' ',high(events));
+  for i := low(events) to high(events) do begin
+    writeln(events[i].to_s);
+  end;
+  { events := database.index; }
 end.

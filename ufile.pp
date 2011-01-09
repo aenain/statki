@@ -5,12 +5,13 @@ interface
 uses dos, crt, tripleoperator, udate, utime, udatetime, uevent, uposition, uinput;
 
 type
-  tcalendar = file of tevent;
+  //tcalendar = file of tevent;
+  tcalendar = text; { w pliku elementowym nie działała alokacja pamięci na obiekty powiązane }
   tevents = array of tevent;
 
   tfile = class
     public
-      procedure add(event : tevent);
+      procedure add(new_event : tevent);
       procedure delete(name : string);
       function index : tevents;
       constructor create;
@@ -21,16 +22,17 @@ type
 
 implementation
 
-procedure tfile.add(event : tevent);
+procedure tfile.add(new_event : tevent);
 var
   events : tevents;
-  i : integer;
+  size : integer;
+  event : tevent;
 
 begin
   events := self.index;
-  i := length(events);
-  setlength(events, i + 1);
-  events[i] := event;
+  size := length(events);
+  setlength(events, size + 1);
+  events[size] := new_event;
   self.save(events);
 end;
 
@@ -38,42 +40,67 @@ procedure tfile.delete(name : string);
 var
   events : tevents;
   event : tevent;
-  i, j : integer;
-  count : integer; { ilość elementów wyszukanych po name, które zostaną usunięte }
+  i, size : integer;
+  to_remove_count : integer; { ilość elementów wyszukanych po name, które zostaną usunięte }
 
 begin
   events := self.index;
-  count := 0;
+  size := length(events);
+  to_remove_count := 0;
+
   for i := low(events) to high(events) do begin
     if (events[i].name = name) then begin
-      j := i;
-      inc(count);
+      dec(size);
+      inc(to_remove_count);
+      events[i] := events[size]; { przepisanie na pozycję usuwanego elementu elementu ostatniego }
+      setlength(events, size); { usunięcie ostatniego elementu }
     end;
   end;
 
-  if (count = 1) then begin { jeśli znaleziono tylko jeden element, to procedura usuwania }
-    events[j] := events[i]; { w miejsce usuwanego elementu jest przypisywany ostatni element, żeby móc zmniejszyć tablicę }
-    setlength(events, length(events) - 1);
-    self.save(events);
-  end;
+  writeln('Usunieto ', to_remove_count, 'elementów');
+  self.save(events);
 end;
 
-function tfile.index : tevents;
+function tfile.index : tevents; { metoda zwraca wszystkie eventy z pliku }
 var
   calendar : tcalendar;
   events : tevents;
-  i : integer;
+  size : integer;
   event : tevent;
+  row : string;
 
 begin
   assign(calendar, self.path);
   reset(calendar);
+  size := 0;
 
-  i := 0;
   while not (eof(calendar)) do begin
-    inc(i);
-    setlength(events, i);
-    read(calendar, events[i-1]); { TODO! z tym przypisywaniem to jakaś lipa... }
+    inc(size);
+    setlength(events, size);
+
+    event := tevent.create;
+
+    readln(calendar, event.name);
+
+    readln(calendar, row); { czy event całodniowy? }
+    event.all_day := ifthen(row = 'TRUE', true, false);
+
+    readln(calendar, row); { czy event jest rokroczny? }
+    event.anniversary := ifthen(row = 'TRUE', true, false);
+
+    readln(calendar, row); { data rozpoczęcia }
+    event.start.date.to_date(row);
+
+    readln(calendar, row); { godzina rozpoczęcia }
+    event.start.time.to_time(row);
+
+    readln(calendar, row); { data zakończenia }
+    event.finish.date.to_date(row);
+
+    readln(calendar, row); { godzina zakończenia }
+    event.finish.time.to_time(row);
+
+    events[size-1] := event;
   end;
 
   close(calendar);
@@ -82,7 +109,7 @@ end;
 
 constructor tfile.create;
 begin
-  self.path := 'events.dat'; { ścieżka do pliku z eventami }
+  self.path := 'events.txt'; { ścieżka do pliku z eventami }
 end;
 
 procedure tfile.save(events : tevents);
@@ -94,8 +121,14 @@ begin
   assign(calendar, self.path);
   rewrite(calendar);
   
-  for i := 0 to length(events) - 1 do begin
-    write(calendar, events[i]);
+  for i := low(events) to high(events) do begin
+    writeln(calendar, events[i].name); { nazwa }
+    writeln(calendar, events[i].all_day); { czy całodzienny? }
+    writeln(calendar, events[i].anniversary); { czy rokroczny? }
+    writeln(calendar, events[i].start.date.to_s); { data rozpoczęcia }
+    writeln(calendar, events[i].start.time.to_s); { godzina rozpoczęcia }
+    writeln(calendar, events[i].finish.date.to_s); { data zakończenia }
+    writeln(calendar, events[i].finish.time.to_s); { godzina zakończenia }
   end;
   
   close(calendar);

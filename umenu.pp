@@ -15,6 +15,7 @@ type
 
   tmenu = class
     event : tresource;
+    constructor create;
   end;
 {
   tcalendar = file of tevent;
@@ -26,17 +27,16 @@ procedure tresource.add;
 var
   a : char;
   event : tevent;
-  input : tinput;
+  str_data : string;
   calendar : tcalendar;
   events : tevents;
   i : integer;
 
 begin { TODO! refactor this stuff, especially operations like read and write from/to file! }
-  input := tinput.create(1,1);
   event := tevent.create;
   writeln('Podaj nazwę');
-  readln(input.sequence);
-  event.name := input.sequence;
+  readln(str_data);
+  event.name := str_data;
   writeln('Czy całodzienny? 1. tak, 2. nie');
   a := readkey;
   event.all_day := ifthen(a = '1', true, false);
@@ -44,27 +44,29 @@ begin { TODO! refactor this stuff, especially operations like read and write fro
   a := readkey;
   event.anniversary := ifthen(a = '1', true, false);
   if (event.all_day) then begin
-    writeln('Podaj datę [dd.mm.yyyy]');
-    readln(input.sequence);
-    event.start.date := input.to_date;
-    event.finish.date := input.to_date;
+    if (event.anniversary) then writeln('Podaj datę pierwotnego wydarzenia [dd.mm.yyyy]')
+    else writeln('Podaj datę [dd.mm.yyyy]');
+
+    readln(str_data);
+    event.start.date.to_date(str_data);
+    event.finish.date.to_date(str_data);
     event.start.time.to_time(0);
     event.finish.time.to_time(8639999);
   end else begin
     writeln('Podaj datę rozpoczęcią [dd.mm.yyyy]');
-    readln(input.sequence);
-    event.start.date := input.to_date;
+    readln(str_data);
+    event.start.date.to_date(str_data);
     writeln('Podaj godzinę rozpoczęcia [hh:mm]');
-    readln(input.sequence);
-    event.start.time := input.to_time;
+    readln(str_data);
+    event.start.time.to_time(str_data);
     writeln('Podaj datę zakończenia [dd.mm.yyyy]');
-    readln(input.sequence);
-    event.finish.date := input.to_date;
+    readln(str_data);
+    event.finish.date.to_date(str_data);
     writeln('Podaj godzinę zakończenia [hh:mm]');
-    readln(input.sequence);
-    event.finish.time := input.to_time;
+    readln(str_data);
+    event.finish.time.to_time(str_data);
   end;
-  
+
   self.database.add(event);
 end;
 
@@ -84,6 +86,11 @@ end;
 constructor tresource.create;
 begin
   self.database := tfile.create;
+end;
+
+constructor tmenu.create;
+begin
+  self.event := tresource.create;
 end;
 
 end.
