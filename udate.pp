@@ -106,7 +106,7 @@ begin
   self.year := 1970;
   self.month := 1;
   self.day := 1;
-  self.wday := self.calculate_wday;
+  self.calculate_wday;
 end;
 
 end.
