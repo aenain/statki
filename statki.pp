@@ -7,6 +7,10 @@ type
     y : char;
     x : integer; 
   end;
+  
+  tcursor = record { gdzie jest kursor? }
+    x, y : word;
+  end;
 
   area = array['A'..'J'] of array[1..10] of char; { akwen morski :) }
   areas = array[1..2] of area;
@@ -25,6 +29,9 @@ const
   error_color = 4; { 4 - czerwony }
   area_color = 15; { 15 - biały }
   border_color = 8; { 8 - ciemnoszary }
+  hit_color = 4; { 4 - czerwony }
+  ship_color = 15; { 2- zielony }
+  miss_color = 7; { 7 - jasnoszary }
   width_between_areas = 10; { ilość spacji między dwoma tabelami }
   ships : array[1..5] of integer = (5,4,3,3,2); { możliwe statki do wyboru }
   default_mark = ' '; { znacznik pustego pola na planszy }
@@ -56,6 +63,18 @@ var
   player1_max_weight, player2_max_weight : integer; { przechowują maksymalną wartość wagi na akwenie }
   player1_number_of_hits, player2_number_of_hits : integer; { ilości trafień w statki przeciwników }
   win_if : integer; { wygrana, gdy trafi wszystkie statki, inaczej: suma długości statków }
+  cursor : tcursor; { gdzie jest kursor?! }
+  drawings : tcursor; { gdzie rysować tablice? }
+  player1_last_shot, player2_last_shot : shot; { ostatnie strzały obu graczy - do kolorowania pól }
+  wait : boolean; { musi czekać z wczytywaniem znaku, żeby oczyścić bufor }
+  is_it_really_beginning_of_game, areas_are_still_visible : boolean;
+
+
+procedure clearline(x, y : word);
+forward;
+
+procedure clearlines(x, y, how_many_lines : word);
+forward;
 
 { BLOCK1: PART! funkcje wypisujące różne rzeczy ;) }
 
@@ -66,9 +85,13 @@ procedure setting_ship_actions(param : integer; length : integer);
 begin
   textcolor(action_color);
   if (param = 1) then begin
-    writeln('Podaj współrzędne lewego górnego rogu statku o długości ', length);
+    clearlines(2, 25, 5);
+    write('Podaj współrzędne lewego górnego rogu statku o długości ', length);
+    gotoxy(2, 26);
   end else begin
-    writeln('Wybierz kierunek: 1.poziomo; 2.pionowo');
+    gotoxy(2, 27);
+    write('Wybierz kierunek: 1.poziomo; 2.pionowo');
+    gotoxy(2, 28);
   end;
   textcolor(input_color);
 end;
@@ -78,6 +101,9 @@ procedure print_head_of_area(how_many_times : integer);
 var i, x : integer;
 
 begin
+  gotoxy(2,2);
+  drawings.x := 2;
+  drawings.y := 2;
   textcolor(area_color);
   for i := 1 to how_many_times do begin
     textcolor(border_color);
@@ -90,7 +116,9 @@ begin
     end;
     if (i < how_many_times) then write('':width_between_areas);
   end;
-  writeln;
+  gotoxy(2,3);
+  drawings.x := 2;
+  drawings.y := 3;
   textcolor(normal_color);
 end;
 
@@ -100,11 +128,13 @@ var i : integer;
 
 begin
   textcolor(border_color);
+  gotoxy(drawings.x, drawings.y);
   for i := 1 to how_many_times do begin
     write('  -------------------------------');
     if (i < how_many_times) then write('':width_between_areas);
   end;
-  writeln;
+  inc(drawings.y);
+  gotoxy(drawings.x,drawings.y);
   textcolor(normal_color);
 end;
 
@@ -116,21 +146,32 @@ var
 
 begin
   textcolor(border_color);
+  gotoxy(2,4);
   for y:= 'A' to M do begin
     for i := 1 to how_many_areas do begin
       textcolor(area_color);
       write(y:2);
       textcolor(border_color);
       write('|');
-      for x := 1 to N do begin
-        textcolor(area_color);
+      for x := 1 to N do begin        
+        textcolor(miss_color);
+        
+        if(plansze[i][y][x] = ship_mark) then textcolor(ship_color);
+        if(plansze[i][y][x] = hit_mark) then textcolor(hit_color);
+
+        if (i = 1) then begin
+          if (x = player2_last_shot.x) and (y = player2_last_shot.y) then textcolor(greeting_color);        
+        end else begin
+          if (x = player1_last_shot.x) and (y = player1_last_shot.y) then textcolor(greeting_color);
+        end;
+
         write(plansze[i][y][x], plansze[i][y][x]);
         textcolor(border_color);
         write('|');
       end;
       if (i < how_many_areas) then write('':width_between_areas);
     end;
-    writeln;
+    inc(drawings.y);
     print_horizontal_border(how_many_areas);
   end;
   textcolor(normal_color);
@@ -154,7 +195,7 @@ var plansze : areas;
 begin
   plansze[1] := plansza1;
   plansze[2] := plansza2;
-  writeln;
+
   print_head_of_area(2); { wypisuje nagłówki +2+ tabel }
   print_horizontal_border(2); { wypisuje poziome kreski dla +2+ tabel }
   print_only_areas(2, plansze); { wypisuje tylko zawartość tabel + lewą kolumnę z literami }
@@ -164,7 +205,8 @@ end;
 procedure error_wrong_place_for_ship;
 begin
   textcolor(error_color);
-  writeln('Statek nie może zostać umieszczony w podanym miejscu.');
+  clearline(2, 30);
+  write('Statek nie może zostać umieszczony w podanym miejscu.');
   textcolor(normal_color);
 end;
 
@@ -333,11 +375,15 @@ var
 
 begin
   print_area(player1_ships_on_area); { rysowanie planszy gracza }
+  clearline(8,41);
+
   for i := 1 to 5 do begin { na sztywno ustawiona ilość statków - 5 }
     placed := 0; { false, nie udalo sie jeszcze umiescic statku }
     repeat { próbuje umieścić statek tak długo, aż mu się uda }
       setting_ship_actions(1, ships[i]); { drugi parametr - długość statku }
       readln(target); { wczytanie współrzędnych }
+      clearline(2, 30);
+      gotoxy(2, 27);
       location := string_to_location(target); { wybór lokalizacji lewego górnego rogu statku }
       setting_ship_actions(2, 0);
       { wybór kierunku, w którym chcemy umieścić statek. Lewy górny róg statku będzie określany }
@@ -356,6 +402,8 @@ begin
       print_area(player1_ships_on_area); { wypisanie planszy }
     until(placed = 1);
   end;
+  textcolor(input_color);
+  gotoxy(2, 25);
 end;
 
 { METHOD: set_cpu_ships - zarzadza ustawianiem statkow dla komputera }
@@ -389,6 +437,9 @@ end;
 procedure new_game; { uniknięcie zapętlenia }
 forward;
 
+procedure menu;
+forward;
+
 procedure actions_game; { again }
 forward;
 
@@ -398,7 +449,9 @@ forward;
 procedure choose_location_action;
 begin
   textcolor(action_color);
-  writeln('Podaj współrzędne, gdzie chcesz strzelić');
+  clearlines(2, 25, 5);
+  write('Podaj współrzędne, gdzie chcesz strzelić');
+  gotoxy(2, 26);
   textcolor(normal_color);
 end;
 
@@ -407,7 +460,9 @@ end;
 procedure error_dont_shoot_twice_the_same_place;
 begin
   textcolor(error_color);
-  writeln('Już oddałeś strzał w to miejsce. Spróbuj w inne.');
+  clearline(2, 30);
+  write('Już oddałeś strzał w to miejsce. Spróbuj w inne.');
+  gotoxy(2,25);
   textcolor(normal_color);
 end;
 
@@ -415,7 +470,9 @@ end;
 procedure you_hit_the_ship;
 begin
   textcolor(greeting_color);
+  clearline(2, 30);
   writeln('Trafiłeś wrogi okręt! Doskonale!');
+  gotoxy(2,25);
   textcolor(normal_color);
 end;
 
@@ -423,7 +480,9 @@ end;
 procedure you_missed_the_ship;
 begin
   textcolor(greeting_color);
+  clearline(2, 30);
   writeln('Niestety nie trafiłeś w żaden okręt.');
+  gotoxy(2,25);
   textcolor(normal_color);
 end;
 
@@ -431,15 +490,19 @@ end;
 procedure someone_win_the_game(player : integer);
 begin
   textcolor(greeting_color);
+  clearline(2, 30);
+
   if (state = 1) then begin
     if (player = 1) then begin
-      writeln('Właśnie zniszczyłeś flotę przeciwnika! Gratulacje!');
+      write('Właśnie zniszczyłeś flotę przeciwnika! Gratulacje!');
     end else begin
-      writeln('Niestety Twoja flota została zniszczona.');
+      write('Niestety Twoja flota została zniszczona.');
     end;
   end else begin
-    writeln('Zwyciężył gracz nr ', player);
+    write('Zwyciężył gracz nr ', player);
   end;
+  
+  gotoxy(2, 25);
   textcolor(normal_color);
 end;
 
@@ -455,9 +518,16 @@ var
 begin
   choose_location_action;
   shooted := 0; { nie został jeszcze oddany strzał w tej turze. }
+  clearline(8,41);
+  gotoxy(2, 26);
+
   repeat { próbuj strzelać, aż strzelisz w pole, w które nie strzelałeś jeszcze }
+    textcolor(input_color);
     readln(target);
+    textcolor(7);
     location := string_to_location(target);
+    player1_last_shot := location; { ostatnio oddany strzał playera }
+
     if (player1_shots_on_area[location.y][location.x] <> default_mark) then begin
       error_dont_shoot_twice_the_same_place; { oddano już strzał w to miejsce }
     end else begin
@@ -608,6 +678,8 @@ var
   count_locations : integer; { ilość lokalizacji o najwyższej wadze }
 
 begin
+  if(state = 2) then delay(100);
+
   if (player = 1) then begin { przypisanie odpowiednich zmiennych w zależności od tego, do którego gracza mają się odnosić }
     max_weight := player1_max_weight;
     weights := player1_weights;
@@ -646,6 +718,8 @@ begin
   location := best_locations[i]; { tam będziemy strzelać }
 
   if (player = 1) then begin { strzelał pierwszy gracz }
+    player1_last_shot := location; { ostatni oddany strzał przez tego gracza }
+
     if (player2_ships_on_area[location.y][location.x] = ship_mark) then begin { trafienie statku należącego do drugiego gracza }
       player2_ships_on_area[location.y][location.x] := hit_mark; { przypisanie trafienia }
       player1_shots_on_area[location.y][location.x] := hit_mark;
@@ -657,6 +731,8 @@ begin
       update_weights(1, location, 'miss'); { aktualizacja wag w tablicy playera1, ostatni parametr oznacza pudło }
     end;
   end else begin { strzelał drugi gracz }
+    player2_last_shot := location; { ostatni oddany strzał przez tego gracza }
+
     if (player1_ships_on_area[location.y][location.x] = ship_mark) then begin { trafienie statku należącego do pierwszego gracza }
       player1_ships_on_area[location.y][location.x] := hit_mark; { przypisanie trafienia }
       player2_shots_on_area[location.y][location.x] := hit_mark;
@@ -672,19 +748,59 @@ end;
 
 { BLOCK1: PART! }
 
+{ METHOD: clearline - czyszczenie danej linii i powrót na jej początek }
+
+procedure clearline(x, y : word);
+begin
+  gotoxy(x, y);
+  write('':(80 - x));
+  gotoxy(x, y);
+end;
+
+{ METHOD: clearlines - czyszczenie kilku linii na raz i powrót na początek bloku }
+
+procedure clearlines(x, y, how_many_lines : word);
+var
+  row : integer;
+
+begin
+  gotoxy(x, y);
+  for row := 1 to how_many_lines do begin
+    gotoxy(x, y + row - 1);
+    write('':(80 - x));
+  end;
+  gotoxy(x, y);
+end;
+
 { METHOD: actions - wyswietlanie mozliwych akcji w zaleznosci od stanu programu:
-                    0 - wyswietla mozliwosc wyboru trybu gry }
+                    0 - wyswietla mozliwosc wyboru trybu gry }                  
+                    
 procedure actions;
 begin
-  textcolor(menu_color);
   if (state = 0) then begin
-    writeln('1. Gracz vs Komputer');
-    writeln('2. Komputer vs Komputer');
+    gotoxy(2, 41);
+    clearline(2, 41);
+    textcolor(greeting_color);
+    write('Menu: ');
+    textcolor(normal_color);
+    write('1. ');
+    textcolor(7);
+    write('Gracz vs Komputer ');
+    textcolor(normal_color);
+    write('2. ');
+    textcolor(7);
+    write('Komputer vs Komputer ');
+    textcolor(normal_color);
+    write('0. ');
+    textcolor(7);
+    write('Zakończ ');
+    gotoxy(2, 2);
     textcolor(input_color);
     choice := readkey;
     case choice of
       '1': state := 1;
       '2': state := 2;
+      '0': begin clrscr; halt; end;
     end;
     new_game;
   end;
@@ -711,11 +827,15 @@ begin
     print_two_areas(player1_ships_on_area, player2_ships_on_area);
   end;
 
-  if (player1_number_of_hits >= win_if) or (player2_number_of_hits >= win_if) then begin { sprawdzenie, czy ktoś już wygrał }
+  if (state = 2) then delay(100);
+
+  if ((player1_number_of_hits >= win_if) or (player2_number_of_hits >= win_if)) then begin { sprawdzenie, czy ktoś już wygrał }
     winner := 1; { założenie, że wygrał pierwszy gracz }
     if (player2_number_of_hits > player1_number_of_hits) then winner := 2; { sprawdzenie, czy może jednak nie wygrał gracz drugi. Tak, brakuje operatora trójargumentowego. }
     someone_win_the_game(winner); { informacja o tym, że ktoś wygrał. parametr - numer gracza, ktory jest zwyciezca }
+    areas_are_still_visible := true;
     state := 0;
+    wait := true;
     actions_game; { powrót do menu głównego poprzez metodę actions_game, żeby uniknąć niepotrzebnego forwardowania }
   end else begin
     actions_game;
@@ -727,7 +847,13 @@ procedure first_move;
 begin
   { rysuje tablice }
   if (state = 1) then print_two_areas(player1_ships_on_area, player1_shots_on_area);
-  next_move; { następny ruch }
+  if (state = 2) then begin
+    if (keypressed) then begin state := 0; wait := true; menu; end
+    else next_move;
+  end else begin
+    clearlines(2, 27, 5);
+    next_move; { następny ruch }
+  end;
 end;
 
 { BLOCK1: PART! - wypisywanie menu podczas gry }
@@ -735,42 +861,100 @@ end;
 { METHOD: menu - wyswietlanie menu w zaleznosci od stanu programu }
 procedure menu;
 begin
-  textcolor(menu_color);
-  writeln('1. Nowa gra');
-  writeln('0. Zakończ');
+  textcolor(greeting_color);
+  gotoxy(2, 41);
+  clearline(2, 41);
+  write('Menu: ');
   textcolor(normal_color);
-
+  write('1. ');
+  textcolor(7);
+  write('Nowa gra ');
+  textcolor(normal_color);
+  write('0. ');
+  textcolor(7);
+  write('Zakończ ');
+  gotoxy(2, 2);
+  textcolor(input_color);
+  
+  if (wait) then begin
+    if (areas_are_still_visible) then gotoxy(2, 27);
+    readkey;
+    wait := false;
+  end;
+  
   choice := readkey;
+  clearlines(2, 2, 30);
+
   case choice of
     '1': actions;
-    '0': halt;
+    '0': begin clrscr; halt; end;
   end;
+  
+  textcolor(normal_color);
 end;
 
 { METHOD: actions_game - wyświetla menu podczas trwania rozgrywki }
 procedure actions_game;
 begin
-  textcolor(action_color);
-  if (state <> 0) then begin
-    if (state = 1) then begin
-      writeln('1. Wykonaj ruch');
-    end else begin
-      writeln('1. Następny ruch');
+  if (state = 2) then begin
+    delay(500);
+
+    if (keypressed) then begin state := 0; clearlines(1, 1, 40); areas_are_still_visible := false; wait := true; menu; end
+    else begin
+      if (is_it_really_beginning_of_game) then begin
+        textcolor(greeting_color);
+        gotoxy(2, 41);
+        clearline(2, 41);
+        write('Menu: ');
+        textcolor(7);
+        write('Naciśnij dowolny klawisz, żeby przerwać rozgrywkę ');
+        gotoxy(2, 23);
+        
+        is_it_really_beginning_of_game := false;
+      end;
+
+      first_move;
     end;
 
-    writeln('2. Przerwij rozgrywkę');
-    textcolor(input_color);
-    choice := readkey;
-    case choice of
-      '1': first_move;
-      '2': begin
-        state := 0;
-        clrscr;
-        menu;
+  end else begin
+    if (state <> 0) then begin
+      textcolor(greeting_color);
+      gotoxy(2, 41);
+      clearline(2, 41);
+      write('Menu: ');
+      textcolor(normal_color);
+      write('1. ');
+      textcolor(7);
+      if (state = 1) then write('Wykonaj ruch ')
+      else write('Następny ruch ');
+
+      textcolor(normal_color);
+      write('2. ');
+      textcolor(7);
+      write('Przerwij rozgrywkę ');
+      textcolor(normal_color);
+      write('0. ');
+      textcolor(7);
+      write('Zakończ ');
+      clearlines(2, 25, 5);
+      textcolor(input_color);
+
+      choice := readkey;
+      case choice of
+        '1': first_move;
+        '2': begin
+          state := 0;
+          { clrscr; }
+          clearlines(1, 1, 40);
+          areas_are_still_visible := false;
+          wait := true;
+          menu;
+        end;
+        '0' : begin clrscr; halt; end;
       end;
+    end else begin { przypadek, gdy gra się właśnie skończyła }
+      menu;
     end;
-  end else begin { przypadek, gdy gra się właśnie skończyła }
-    menu;
   end;
   textcolor(normal_color);
 end;
@@ -784,6 +968,9 @@ begin
   init_weights;
   init_areas;
   init_hits;
+  is_it_really_beginning_of_game := true;
+  areas_are_still_visible := true;
+
   if (state = 1) then begin
     set_player_ships
   end else begin
@@ -799,16 +986,19 @@ end;
 procedure powitanie;
 begin
   clrscr;
-  textcolor(greeting_color);
-  writeln('Witaj w grze STATKI');
-  writeln('Copyright: 2010 Artur Hebda');
-  textcolor(normal_color);
+  textcolor(7);
+  gotoxy(2, 42);
+  write('Statki. Copyright 2010 Artur Hebda');
+  gotoxy(cursor.x, cursor.y);
 end;
 
 { BLOCK2: main program }
 begin
   randomize; { uruchomienie generatora liczb pseudolosowych }
   state := 0;
+  cursor.x := 2;
+  cursor.y := 2;
+  wait := false;
   powitanie;
   menu;
 end.
