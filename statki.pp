@@ -24,9 +24,9 @@ const
   greeting_color = 14; { 14 - żółty }
   error_color = 4; { 4 - czerwony }
   area_color = 15; { 15 - biały }
+  border_color = 8; { 8 - ciemnoszary }
   width_between_areas = 10; { ilość spacji między dwoma tabelami }
   ships : array[1..5] of integer = (5,4,3,3,2); { możliwe statki do wyboru }
-  win_if = 17; { wygrana, gdy trafi wszystkie statki, inaczej: suma długości statków, poki co na sztywno 17 }
   default_mark = ' '; { znacznik pustego pola na planszy }
   ship_mark = '#'; { znacznik statku na planszy }
   hit_mark = 'X'; { znacznik trafienia na planszy }
@@ -55,6 +55,7 @@ var
   player1_weights, player2_weights : area_of_weights; { akweny z podanymi wagami poszczególnych pól, one będą się zmieniać wraz z postępem rozgrywki }
   player1_max_weight, player2_max_weight : integer; { przechowują maksymalną wartość wagi na akwenie }
   player1_number_of_hits, player2_number_of_hits : integer; { ilości trafień w statki przeciwników }
+  win_if : integer; { wygrana, gdy trafi wszystkie statki, inaczej: suma długości statków }
 
 { BLOCK1: PART! funkcje wypisujące różne rzeczy ;) }
 
@@ -79,11 +80,15 @@ var i, x : integer;
 begin
   textcolor(area_color);
   for i := 1 to how_many_times do begin
+    textcolor(border_color);
     write('  |');
     for x := 1 to N do begin
-      write(x:2, '|');
+      textcolor(area_color);
+      write(x:2);
+      textcolor(border_color);
+      write('|');
     end;
-    if (i < how_many_times) then write(' ':width_between_areas);
+    if (i < how_many_times) then write('':width_between_areas);
   end;
   writeln;
   textcolor(normal_color);
@@ -94,10 +99,10 @@ procedure print_horizontal_border(how_many_times : integer);
 var i : integer;
 
 begin
-  textcolor(area_color);
+  textcolor(border_color);
   for i := 1 to how_many_times do begin
     write('  -------------------------------');
-    if (i < how_many_times) then write(' ':width_between_areas);
+    if (i < how_many_times) then write('':width_between_areas);
   end;
   writeln;
   textcolor(normal_color);
@@ -110,14 +115,20 @@ var
   x, i : integer;
 
 begin
-  textcolor(area_color);
+  textcolor(border_color);
   for y:= 'A' to M do begin
     for i := 1 to how_many_areas do begin
-      write(y:2, '|');
+      textcolor(area_color);
+      write(y:2);
+      textcolor(border_color);
+      write('|');
       for x := 1 to N do begin
-        write(plansze[i][y][x], plansze[i][y][x], '|');
+        textcolor(area_color);
+        write(plansze[i][y][x], plansze[i][y][x]);
+        textcolor(border_color);
+        write('|');
       end;
-      if (i < how_many_areas) then write(' ':width_between_areas);
+      if (i < how_many_areas) then write('':width_between_areas);
     end;
     writeln;
     print_horizontal_border(how_many_areas);
@@ -166,7 +177,7 @@ var
   y : char;
   x : integer;
 begin
-  y := target[1];
+  y := upcase(target[1]);
   if (y < 'A') then begin y := 'A' end;
   if (y > M) then begin y := M end;
   delete(target, 1, 1);
@@ -211,9 +222,17 @@ end;
 
 { METHOD: init_hits - ustawienie ilości trafień we wrogie statki dla obu graczy na zero }
 procedure init_hits;
+var
+  ship : integer;
+
 begin
   player1_number_of_hits := 0;
   player2_number_of_hits := 0;
+  win_if := 0;
+
+  for ship := low(ships) to high(ships) do begin
+    inc(win_if, ships[ship]);
+  end;
 end;
 
 { METHOD: place_ship - ustawia statek w wybranym miejscu (wsp + kierunek + długość) i zwraca 1 jeśli sie udało to zrobić lub 0 jeśli nie }
