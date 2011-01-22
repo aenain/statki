@@ -13,33 +13,26 @@ type
     public
       procedure add(new_event : tevent);
       procedure delete(name : string);
-      function index : tevents;
+      function index(conditions : boolean = false; how_many_days_in_advance : word = 2) : tevents;
       constructor create;
     private
       path : string;
-      procedure save(events : tevents);
+      procedure save(events : tevents); overload;
+      procedure save(event : tevent); overload;
   end;
+  
+procedure insertion_sort(var events : tevents); { sortuje po dacie rozpoczecia wydarzenia rosnąco }
 
 implementation
 
 procedure tfile.add(new_event : tevent);
-var
-  events : tevents;
-  size : integer;
-  event : tevent;
-
 begin
-  events := self.index;
-  size := length(events);
-  setlength(events, size + 1);
-  events[size] := new_event;
-  self.save(events);
+  self.save(new_event);
 end;
 
 procedure tfile.delete(name : string);
 var
   events : tevents;
-  event : tevent;
   i, size : integer;
   to_remove_count : integer; { ilość elementów wyszukanych po name, które zostaną usunięte }
 
@@ -57,17 +50,20 @@ begin
     end;
   end;
 
-  writeln('Usunieto ', to_remove_count, 'elementów');
+  { writeln('Usunieto ', to_remove_count, 'elementów'); }
   self.save(events);
 end;
 
-function tfile.index : tevents; { metoda zwraca wszystkie eventy z pliku }
+function tfile.index(conditions : boolean = false; how_many_days_in_advance : word = 2) : tevents; { metoda zwraca wszystkie eventy z pliku albo te, które są nadchodzące }
 var
   calendar : tcalendar;
   events : tevents;
   size : integer;
   event : tevent;
   row : string;
+  current : tdatetime;
+  start_of_event : tdatetime; { do obsługi rocznicowych eventów }
+  finish_of_event : tdatetime; 
 
 begin
   assign(calendar, self.path);
@@ -75,9 +71,6 @@ begin
   size := 0;
 
   while not (eof(calendar)) do begin
-    inc(size);
-    setlength(events, size);
-
     event := tevent.create;
 
     readln(calendar, event.name);
@@ -100,10 +93,35 @@ begin
     readln(calendar, row); { godzina zakończenia }
     event.finish.time.to_time(row);
 
-    events[size-1] := event;
+    if not (conditions) then begin
+      inc(size);
+      setlength(events, size);
+      events[size-1] := event;
+
+    end else begin
+      current := tdatetime.create;
+      current.set_current;
+
+      start_of_event := tdatetime.create;
+      finish_of_event := tdatetime.create;
+      start_of_event := event.start;
+      finish_of_event := event.finish;
+
+      if (event.anniversary) then begin
+        start_of_event.date.year := current.date.year;
+        finish_of_event.date.year := current.date.year;
+      end;
+
+      if ((start_of_event.date.distance_from_now_in_days <= how_many_days_in_advance) and (compare2datetimes(finish_of_event, current) > -1)) then begin
+        inc(size);
+        setlength(events, size);
+        events[size-1] := event;
+      end;
+    end;
   end;
 
   close(calendar);
+  insertion_sort(events);
   index := events;
 end;
 
@@ -132,6 +150,44 @@ begin
   end;
   
   close(calendar);
+end;
+
+procedure tfile.save(event : tevent); { w przypadku dodawania nie ma sensu przepisywać całego pliku }
+var
+  calendar : tcalendar;
+
+begin
+  assign(calendar, self.path);
+  append(calendar);
+  
+  writeln(calendar, event.name);
+  writeln(calendar, event.all_day);
+  writeln(calendar, event.anniversary);
+  writeln(calendar, event.start.date.to_s);
+  writeln(calendar, event.start.time.to_s);
+  writeln(calendar, event.finish.date.to_s);
+  writeln(calendar, event.finish.time.to_s);
+  
+  close(calendar);
+end;
+
+procedure insertion_sort(var events : tevents);
+var
+  i, j : integer;
+  key : tevent;
+
+begin
+  for i := low(events) + 1 to high(events) do begin
+    key := events[i];
+    j := i - 1;
+
+    while (j >= 0) and (compare2datetimes(events[j].start, key.start) = 1) do begin
+      events[j+1] := events[j];
+      dec(j);
+    end;
+
+    events[j+1] := key;
+  end;
 end;
 
 end.

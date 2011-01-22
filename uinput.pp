@@ -2,17 +2,20 @@ unit UInput;
 
 interface
 
-uses dos, crt, udate, utime, udatetime, uevent, uposition;
+uses dos, crt, udate, utime, udatetime, uevent, uposition, uoutput;
 
 type
   tinput = class
     public
       sequence : string;
-      index, count : byte; { musi być coś innego niż length, bo nadpisuje metodę length, ale count znaczy length ;p }
+      key : char; { ostatnio wczytany klawisz }
+      { code - kod ascii ostatnio wczytanego znaku }
+      index, code, count : byte; { musi być coś innego niż length, bo nadpisuje metodę length, ale count znaczy length ;p }
       position : tposition; { pozycja lewego rogu na ekranie }
       cursor : tposition; { pozycja kursora na ekranie, podczas tworzenia obiektu powinna być równa position! }
       end_of_reading : boolean; { koniec wczytywania }
-      procedure reading(letter : char);
+      procedure reading;
+      procedure readchar(letter : char);
       procedure writeout;
       procedure reset;
       function to_date : tdate; { zwraca datę z inputa postaci dd.mm.yyyy }
@@ -30,24 +33,31 @@ type
 
 implementation
 
-procedure tinput.reading(letter : char);
-var
-  ascii : byte;
-
+procedure tinput.reading;
 begin
-  if not (self.end_of_reading) then begin
-    ascii := ord(letter);
-
-    case ascii of
-      8  : self.delete_char;
-      13 : self.end_of_reading := true; { naciśnięcie entera kończy wpisywanie danych }
-      75 : self.move_cursor_to_left; { strzałka w lewo }
-      77 : self.move_cursor_to_right; { strzałka w prawo }
-      else self.add_char(letter);
+  textcolor(input_color);
+  if not self.end_of_reading then begin
+    while keypressed do begin
+      self.readchar(readkey);
     end;
-
-    self.writeout;
   end;
+  textcolor(default_color);
+end;
+
+procedure tinput.readchar(letter : char);
+begin
+  self.key := letter;
+  self.code := ord(letter);
+
+  case self.code of
+    8  : self.delete_char;
+    13 : self.end_of_reading := true; { naciśnięcie entera kończy wpisywanie danych }
+    75 : self.move_cursor_to_left; { strzałka w lewo }
+    77 : self.move_cursor_to_right; { strzałka w prawo }
+    else self.add_char(letter);
+  end;
+
+  self.writeout;
 end;
 
 procedure tinput.add_char(letter : char);
@@ -89,8 +99,7 @@ end;
 
 procedure tinput.set_position(x, y : word);
 begin
-  self.position.x := x;
-  self.position.y := y;
+  self.position.set_new(x, y);
   self.cursor.x := self.position.x + self.index - 1;
   self.cursor.y := self.position.y;
 end;
@@ -106,12 +115,15 @@ end;
 
 procedure tinput.reset;
 begin
-  self.set_position(self.position.x, self.position.y);
   self.sequence := '';
-  self.index := 1;
+  self.index := 0;
   self.count := 0;
+  gotoxy(self.position.x, self.position.y);
+  write('':self.max_length);
   self.max_length := 0;
   self.end_of_reading := false;
+  self.set_position(self.position.x, self.position.y);
+  self.index := 1;
 end;
 
 function tinput.to_date : tdate;
@@ -136,7 +148,8 @@ end;
 
 constructor tinput.create(x, y : word);
 begin
-  self.set_position(x, y);
+  self.position := tposition.create(x, y);
+  self.cursor := tposition.create;
   self.reset;
 end;
 

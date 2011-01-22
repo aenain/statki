@@ -5,6 +5,8 @@ interface
 uses dos, crt, udate, utime, udatetime;
 
 type
+  tarray = array of string;
+
   tevent = class
     public
       name : string[50];
@@ -13,6 +15,7 @@ type
       start : tdatetime;
       finish : tdatetime;
       function to_s : string;
+      function to_a : tarray;
       function less_than_a_day : boolean;
       constructor create;
 
@@ -34,17 +37,79 @@ begin
     to_s := which_anniversary_to_s + '. ';
   end;
 
-  to_s := to_s + self.name + ' ';
-  if (self.all_day) then
-    to_s := to_s + self.start.to_s(true, false)
-  else begin
-    if (self.less_than_a_day) then
-      to_s := self.start.to_s(false, true) + ' - ' + self.finish.to_s
-    else begin
-      to_s := 'początek: ' + self.start.to_s;
-      to_s := 'koniec: ' + self.finish.to_s;
+  to_s := to_s + self.name + ' (';
+  if (self.all_day) then begin
+    if (self.anniversary) then to_s := to_s + self.start.to_s(true, false, false, true, true)
+    else to_s := to_s + self.start.to_s(true, false);
+    
+  end else begin
+    if (self.less_than_a_day) then begin
+      if (self.anniversary) then to_s := to_s + self.start.to_s(false, true) + ' - ' + self.finish.to_s(true, true, true, true, true)
+      else to_s := to_s + self.start.to_s(false, true) + ' - ' + self.finish.to_s(true, true, true);
+
+    end else begin
+      if (self.anniversary) then begin
+        to_s := to_s + self.start.to_s(true, true, true, false) + ' - ';
+        to_s := to_s + self.finish.to_s(true, true, true, true, true);
+      end else begin
+        to_s := to_s + self.start.to_s(true, true, true, true) + ' - ';
+        to_s := to_s + self.finish.to_s(true, true, true, true);
+      end;
     end;
   end;
+  to_s := to_s + ')';
+end;
+
+function tevent.to_a : tarray;
+var
+  first_part, second_part : string;
+  which_anniversary_to_s, current_year : string;
+  splitted_content : tarray;
+  current : tdate;
+
+begin
+  current := tdate.create;
+  current.set_current;
+  str(current.year, current_year);
+
+  setlength(splitted_content, 2);
+  first_part := '';
+  second_part := '';
+
+  if (self.anniversary) and (self.which_anniversary > 0) then begin
+    str(which_anniversary, which_anniversary_to_s);
+    first_part := which_anniversary_to_s + '. ';
+  end;
+
+  first_part := first_part + self.name + ' ';
+  
+  if (self.all_day) then begin
+    if (self.anniversary) then second_part := second_part + self.start.to_s(true, false, false, true, true)
+    else second_part := second_part + self.start.to_s(true, false);
+    
+  end else begin
+    if (self.less_than_a_day) then begin
+      if (self.anniversary) then second_part := second_part + self.start.to_s(false, true) + ' - ' + self.finish.to_s(true, true, true, true, true)
+      else second_part := second_part + self.start.to_s(false, true) + ' - ' + self.finish.to_s(true, true, true);
+
+    end else begin
+      if (self.anniversary) then begin
+        second_part := second_part + self.start.to_s(true, true, true, false) + ' - ';
+        second_part := second_part + self.finish.to_s(true, true, true, true, true);
+
+      end else begin
+        second_part := second_part + self.start.to_s(true, true, true, true) + ' - ';
+        second_part := second_part + self.finish.to_s(true, true, true, true);
+      end;
+    end;
+  end;
+  
+  current.destroy;
+  
+  splitted_content[0] := first_part;
+  splitted_content[1] := second_part;
+  
+  to_a := splitted_content; 
 end;
 
 function tevent.which_anniversary : integer;
