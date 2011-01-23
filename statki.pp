@@ -38,7 +38,7 @@ const
   ship_mark = '#'; { znacznik statku na planszy }
   hit_mark = 'X'; { znacznik trafienia na planszy }
   miss_mark = 'O'; { znacznik pudła na planszy }
-  weights : array[1..5] of integer = (0,1,2,3,4); { wagi pól, czyli gdzie najlepiej strzelać, 0 - na pewno nie ma statków, im więcej, tym lepiej! }
+  weights : array[0..5] of integer = (-1,0,1,2,3,4); { wagi pól, czyli gdzie najlepiej strzelać, -1 - trafienie, 0 - na pewno nie ma statków, im więcej, tym lepiej! }
   initial_max_weight = 2; { maksymalna wartość wagi w tablicy initial_weights }
   initial_weights : area_of_weights = ((1,1,1,1,1,1,1,1,1,1),
                                        (1,2,1,1,2,1,1,1,2,1),
@@ -66,6 +66,7 @@ var
   cursor : tcursor; { gdzie jest kursor?! }
   drawings : tcursor; { gdzie rysować tablice? }
   player1_last_shot, player2_last_shot : shot; { ostatnie strzały obu graczy - do kolorowania pól }
+  player1_remain_ships, player2_remain_ships : array of integer; { pozostałe statki do zestrzelenia każdego z graczy }
   wait : boolean; { musi czekać z wczytywaniem znaku, żeby oczyścić bufor }
   is_it_really_beginning_of_game, areas_are_still_visible : boolean;
 
@@ -233,6 +234,20 @@ end;
 
 { BLOCK3: funkcje dotyczace rozpoczynania, kontynuowania badz konczenia rozgrywki:
           init_weights, init_areas, init_hits, new_game, next_move, break_game, set_player_ships, place_ship }
+
+{ METHOD: init_ships - początkowe ustawienie tablic z pozostałymi statkami obu graczy }          
+procedure init_ships;
+var
+  i : integer;
+
+begin
+  for i := 0 to length(ships) - 1 do begin
+    setlength(player1_remain_ships, i + 1);
+    setlength(player2_remain_ships, i + 1);
+    player1_remain_ships[i] := ships[i + 1];
+    player2_remain_ships[i] := ships[i + 1];
+  end;
+end;
 
 { METHOD: init_weights - początkowe wypełnienie akwenów wagami - do algorytmu wyboru pól do strzelania }
 procedure init_weights;
@@ -562,6 +577,7 @@ begin
     player1_weights[y][x] := 0; { żeby nie strzelać drugi raz w to samo miejsce }
 
     if (skutek = 'hit') then begin
+      player1_weights[y][x] := -1; { trafienie oznaczmy jako -1 }
       { przypadek 1. to pierwszy strzał w rejonie, wówczas:
         pionowe i poziome pola przystające ustawiasz na 3,
         skośne na 0 }
@@ -574,42 +590,42 @@ begin
       if (location.y > 'A') and (location.x > 1) then begin { #1 }
         y := chr(ord(location.y) - 1);
         x := location.x - 1;
-        player1_weights[y][x] := 0;
+        if (player1_weights[y][x] > 0) then player1_weights[y][x] := 0;
       end;
       if (location.y > 'A') and (location.x < N) then begin { #3 }
         y := chr(ord(location.y) - 1);
         x := location.x + 1;
-        player1_weights[y][x] := 0;
+        if (player1_weights[y][x] > 0) then player1_weights[y][x] := 0;
       end;
       if (location.y < M) and (location.x < N) then begin { #5 }
         y := chr(ord(location.y) + 1);
         x := location.x + 1;
-        player1_weights[y][x] := 0;
+        if (player1_weights[y][x] > 0) then player1_weights[y][x] := 0;
       end;
       if (location.y < M) and (location.x > 1) then begin { #7 }
         y := chr(ord(location.y) + 1);
         x := location.x - 1;
-        player1_weights[y][x] := 0;
+        if (player1_weights[y][x] > 0) then player1_weights[y][x] := 0;
       end;
       if (location.x > 1) then begin { #8 }
         y := location.y;
         x := location.x - 1;
-        if(player1_weights[y][x] <> 0) then player1_weights[y][x] := 3; any_change := 1;
+        if(player1_weights[y][x] > 0) then begin player1_weights[y][x] := 3; any_change := 1; end;
       end;
       if (location.x < N) then begin { #4 }
         y := location.y;
         x := location.x + 1;
-        if(player1_weights[y][x] <> 0) then player1_weights[y][x] := 3; any_change := 1;
+        if(player1_weights[y][x] > 0) then begin player1_weights[y][x] := 3; any_change := 1; end;
       end;
       if (location.y > 'A') then begin { #2 }
         y := chr(ord(location.y) - 1);
         x := location.x;
-        if(player1_weights[y][x] <> 0) then player1_weights[y][x] := 3; any_change := 1;
+        if(player1_weights[y][x] > 0) then begin player1_weights[y][x] := 3; any_change := 1; end;
       end;
       if (location.y < M) then begin { #6 }
         y := chr(ord(location.y) + 1);
         x := location.x;
-        if(player1_weights[y][x] <> 0) then player1_weights[y][x] := 3; any_change := 1;
+        if(player1_weights[y][x] > 0) then begin player1_weights[y][x] := 3; any_change := 1; end;
       end;
       if (any_change > 0) then player1_max_weight := 3; { w przynajmniej jedno pole wpisano 3, więc jest to najwyższa waga w tabeli playera1 }
     end;
@@ -617,6 +633,7 @@ begin
     player2_weights[y][x] := 0; { żeby nie strzelać drugi raz w to samo miejsce }
     
     if (skutek = 'hit') then begin
+      player2_weights[y][x] := -1; { trafienia ustawmy na -1 }
       { miejsce trafienia ustawić na 0 }
         { 1 2 3
           8 X 4
@@ -624,42 +641,42 @@ begin
       if (location.y > 'A') and (location.x > 1) then begin { #1 }
         y := chr(ord(location.y) - 1);
         x := location.x - 1;
-        player2_weights[y][x] := 0;
+        if (player2_weights[y][x] > 0) then player2_weights[y][x] := 0;
       end;
       if (location.y > 'A') and (location.x < N) then begin { #3 }
         y := chr(ord(location.y) - 1);
         x := location.x + 1;
-        player2_weights[y][x] := 0;
+        if (player2_weights[y][x] > 0) then player2_weights[y][x] := 0;
       end;
       if (location.y < M) and (location.x < N) then begin { #5 }
         y := chr(ord(location.y) + 1);
         x := location.x + 1;
-        player2_weights[y][x] := 0;
+        if (player2_weights[y][x] > 0) then player2_weights[y][x] := 0;
       end;
       if (location.y > 'A') and (location.x > 1) then begin { #7 }
         y := chr(ord(location.y) + 1);
         x := location.x - 1;
-        player2_weights[y][x] := 0;
+        if (player2_weights[y][x] > 0) then player2_weights[y][x] := 0;
       end;
       if (location.x > 1) then begin { #8 }
         y := location.y;
         x := location.x - 1;
-        if(player2_weights[y][x] <> 0) then player2_weights[y][x] := 3; any_change := 1;
+        if(player2_weights[y][x] > 0) then begin player2_weights[y][x] := 3; any_change := 1; end;
       end;
       if (location.x < N) then begin { #4 }
         y := location.y;
         x := location.x + 1;
-        if(player2_weights[y][x] <> 0) then player2_weights[y][x] := 3; any_change := 1;
+        if(player2_weights[y][x] > 0) then begin player2_weights[y][x] := 3; any_change := 1; end;
       end;
       if (location.y > 'A') then begin { #2 }
         y := chr(ord(location.y) - 1);
         x := location.x;
-        if(player2_weights[y][x] <> 0) then player2_weights[y][x] := 3; any_change := 1;
+        if(player2_weights[y][x] > 0) then begin player2_weights[y][x] := 3; any_change := 1; end;
       end;
       if (location.y < M) then begin { #6 }
         y := chr(ord(location.y) + 1);
         x := location.x;
-        if(player2_weights[y][x] <> 0) then player2_weights[y][x] := 3; any_change := 1;
+        if(player2_weights[y][x] > 0) then begin player2_weights[y][x] := 3; any_change := 1; end;
       end;
       if (any_change > 0) then player2_max_weight := 3; { w przynajmniej jedno pole wpisano 3, więc jest to najwyższa waga w tabeli playera 2 }
     end;
@@ -966,6 +983,7 @@ end;
 { METHOD: new_game - rozpoczecie nowej gry. w zaleznosci od stanu beda rozne opcje }
 procedure new_game;
 begin
+  init_ships;
   init_weights;
   init_areas;
   init_hits;
