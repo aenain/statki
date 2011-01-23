@@ -18,7 +18,7 @@ var
 begin
   clrscr;
   gotoxy(2,23);
-  writeln('iCalendar. Copyright 2010 Artur Hebda');
+  writeln('iCalendar. Copyright 2011 Artur Hebda');
   input := tinput.create(2,4);
   output := toutput.create(2,2);
   current := tdatetime.create;
