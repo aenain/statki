@@ -17,6 +17,7 @@ type
   area_of_weights = array['A'..'J'] of array[1..10] of integer; { wagi na akwenie morskim }
   direction = (pionowo, poziomo); { wybór kierunku, w którym chcemy umieścić statek. Lewy górny róg statku będzie określany }
   locations = array[1..100] of shot; { tablica lokalizacji }
+  dyn_array_of_ships = array of integer;
 
 const
   N = 10; { rozmiar planszy, poki co na sztywno 10 }
@@ -66,7 +67,9 @@ var
   cursor : tcursor; { gdzie jest kursor?! }
   drawings : tcursor; { gdzie rysować tablice? }
   player1_last_shot, player2_last_shot : shot; { ostatnie strzały obu graczy - do kolorowania pól }
-  player1_remain_ships, player2_remain_ships : array of integer; { pozostałe statki do zestrzelenia każdego z graczy }
+  player1_last_hit, player2_last_hit : shot; { ostatnie trafienia poszczególnych graczy }
+  player1_sunken, player2_sunken : boolean; { czy dany gracz ostatnio zatopił statek? }
+  player1_remain_ships_to_sink, player2_remain_ships_to_sink : dyn_array_of_ships; { pozostałe statki do zestrzelenia każdego z graczy }
   wait : boolean; { musi czekać z wczytywaniem znaku, żeby oczyścić bufor }
   is_it_really_beginning_of_game, areas_are_still_visible : boolean;
 
@@ -242,11 +245,17 @@ var
 
 begin
   for i := 0 to length(ships) - 1 do begin
-    setlength(player1_remain_ships, i + 1);
-    setlength(player2_remain_ships, i + 1);
-    player1_remain_ships[i] := ships[i + 1];
-    player2_remain_ships[i] := ships[i + 1];
+    setlength(player1_remain_ships_to_sink, i + 1);
+    setlength(player2_remain_ships_to_sink, i + 1);
+    player1_remain_ships_to_sink[i] := ships[i + 1];
+    player2_remain_ships_to_sink[i] := ships[i + 1];
   end;
+  player1_last_hit.x := 0; { poza akwenem - wartownik }
+  player1_last_hit.y := 'A';
+  player2_last_hit.x := 0;
+  player2_last_hit.y := 'A';
+  player1_sunken := false;
+  player2_sunken := false;
 end;
 
 { METHOD: init_weights - początkowe wypełnienie akwenów wagami - do algorytmu wyboru pól do strzelania }
@@ -561,6 +570,110 @@ begin
   until(shooted = 1);
 end;
 
+procedure update_info_about_sinking(var player_weights : area_of_weights; current_shot : shot; var last_hit : shot; if_hit : boolean; var player_sunken : boolean; var remain_ships : dyn_array_of_ships);
+var
+  in_which_direction : integer;
+  current, prev : shot;
+  i, length_of_ship, max_length_of_ship, at : integer;
+  x, x_next, x_prev : integer;
+  y, y_next, y_prev : char;
+
+begin
+  x := current_shot.x;
+  y := current_shot.y;
+  x_next := x + 1;
+  x_prev := x - 1;
+  y_next := chr(ord(y) + 1);
+  y_prev := chr(ord(y) - 1);
+  in_which_direction := 0;
+  
+  if (y_prev >= 'A') and (player_weights[y_prev][x] = -1) then in_which_direction := 1; { do góry }
+  if (x_next <= N) and (player_weights[y][x_next] = -1) then in_which_direction := 2; { w prawo }
+  if (y_next <= M) and (player_weights[y_next][x] = -1) then in_which_direction := 3; { w dół }
+  if (x_prev >= 1) and (player_weights[y][x_prev] = -1) then in_which_direction := 4; { w lewo }
+    
+  length_of_ship := 0;
+  max_length_of_ship := 0;
+  at := -1;
+    
+  for i := low(remain_ships) to high(remain_ships) do begin
+    if (remain_ships[i] > max_length_of_ship) then begin
+      at := i;
+      max_length_of_ship := remain_ships[i]; { najdłuższy statek, jaki pozostał do zestrzelenia }
+    end;
+  end;
+  
+  if not (if_hit) then begin { pudło }
+    in_which_direction := 0;
+    
+    if not (player_sunken) and (last_hit.x > 0) then begin
+      if (current_shot.y < last_hit.y) and (current_shot.x = last_hit.x) and (player_weights[y_next][x] = -1) then in_which_direction := 3;
+      if (current_shot.y > last_hit.y) and (current_shot.x = last_hit.x) and (player_weights[y_prev][x] = -1) then in_which_direction := 1;
+      if (current_shot.x < last_hit.x) and (current_shot.y = current_shot.y) and (player_weights[y][x_next] = -1) then in_which_direction := 2;
+      if (current_shot.x > last_hit.x) and (current_shot.y = current_shot.y) and (player_weights[y][x_prev] = -1) then in_which_direction := 4;
+    
+    end else player_sunken := false;
+    
+    prev := current_shot;
+    current := prev;
+    
+  end else begin { trafienie }
+    current := last_hit;
+    prev := current;  
+  end;
+
+  case in_which_direction of
+    1 : begin
+      if (if_hit) then prev.y := succ(prev.y)
+      else current.y := pred(current.y);
+
+      while (current.y >= 'A') and (player_weights[current.y][current.x] = -1) do begin
+        current.y := pred(current.y);
+        inc(length_of_ship);
+      end;
+    end;
+      
+    2 : begin
+      if (if_hit) then dec(prev.x)
+      else inc(current.x);
+       
+      while (current.x <= N) and (player_weights[current.y][current.x] = -1) do begin
+        inc(current.x);
+        inc(length_of_ship);
+      end;
+    end;
+      
+    3 : begin
+      if (if_hit) then prev.y := pred(prev.y)
+      else current.y := succ(current.y);
+      
+      while (current.y <= M) and (player_weights[current.y][current.x] = -1) do begin
+        current.y := succ(current.y);
+        inc(length_of_ship);
+      end;
+    end;
+      
+    4 : begin
+      if (if_hit) then inc(prev.x)
+      else dec(current.x);
+      
+      while (current.x >= 1) and (player_weights[current.y][current.x] = -1) do begin
+        dec(current.x);
+        inc(length_of_ship);
+      end;
+    end;
+  end;
+    
+  if (length_of_ship >= max_length_of_ship) and (at >= 0) and (in_which_direction > 0) then begin { wystrzelano najdłuższy okręt }
+    remain_ships[at] := 0;
+    player_sunken := true;
+      
+    if (current.x >= 1) and (current.x <= N) and (current.y >= 'A') and (current.y <= M) and (player_weights[current.y][current.x] > 0) then player_weights[current.y][current.x] := 0;
+    if (prev.x >= 1) and (prev.x <= N) and (prev.y >= 'A') and (prev.y <= M) and (player_weights[prev.y][prev.x] > 0) then player_weights[prev.y][prev.x] := 0;
+  end;
+
+end; 
+
 { METHOD: update_weights - metoda, która aktualizuje wagi w tablicy danego playera w zależności od ostatniego strzału i jego powodzenia }
 procedure update_weights(player : integer; location : shot; skutek : string);
 var
@@ -578,6 +691,8 @@ begin
 
     if (skutek = 'hit') then begin
       player1_weights[y][x] := -1; { trafienie oznaczmy jako -1 }
+      player1_last_hit := location; { update ostatniego trafienia }
+      update_info_about_sinking(player1_weights, location, player1_last_hit, true, player1_sunken, player1_remain_ships_to_sink);
       { przypadek 1. to pierwszy strzał w rejonie, wówczas:
         pionowe i poziome pola przystające ustawiasz na 3,
         skośne na 0 }
@@ -628,12 +743,15 @@ begin
         if(player1_weights[y][x] > 0) then begin player1_weights[y][x] := 3; any_change := 1; end;
       end;
       if (any_change > 0) then player1_max_weight := 3; { w przynajmniej jedno pole wpisano 3, więc jest to najwyższa waga w tabeli playera1 }
-    end;
+    
+    end else update_info_about_sinking(player1_weights, location, player1_last_hit, false, player1_sunken, player1_remain_ships_to_sink);
   end else begin { strzelał drugi gracz }
     player2_weights[y][x] := 0; { żeby nie strzelać drugi raz w to samo miejsce }
     
     if (skutek = 'hit') then begin
       player2_weights[y][x] := -1; { trafienia ustawmy na -1 }
+      player2_last_hit := location; { update ostatniego trafienia }
+      update_info_about_sinking(player2_weights, location, player2_last_hit, true, player2_sunken, player2_remain_ships_to_sink);
       { miejsce trafienia ustawić na 0 }
         { 1 2 3
           8 X 4
@@ -679,7 +797,8 @@ begin
         if(player2_weights[y][x] > 0) then begin player2_weights[y][x] := 3; any_change := 1; end;
       end;
       if (any_change > 0) then player2_max_weight := 3; { w przynajmniej jedno pole wpisano 3, więc jest to najwyższa waga w tabeli playera 2 }
-    end;
+    
+    end else update_info_about_sinking(player2_weights, location, player2_last_hit, false, player2_sunken, player2_remain_ships_to_sink);
   end;
 end;
 
@@ -721,10 +840,10 @@ begin
 
     if(count_locations = 0) then begin { nie znaleziono żadnych pól o zadanej wadze }
       if (player = 1) then begin
-        dec(player1_max_weight);
+        if (player1_max_weight > 1) then dec(player1_max_weight);
         max_weight := player1_max_weight;
       end else begin
-        dec(player2_max_weight);
+        if (player2_max_weight > 1) then dec(player2_max_weight);
         max_weight := player2_max_weight;
       end;
     end;
