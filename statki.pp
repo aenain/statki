@@ -835,7 +835,7 @@ begin
     someone_win_the_game(winner); { informacja o tym, że ktoś wygrał. parametr - numer gracza, ktory jest zwyciezca }
     areas_are_still_visible := true;
     state := 0;
-    wait := true;
+    wait := false;
     actions_game; { powrót do menu głównego poprzez metodę actions_game, żeby uniknąć niepotrzebnego forwardowania }
   end else begin
     actions_game;
@@ -876,8 +876,9 @@ begin
   gotoxy(2, 2);
   textcolor(input_color);
   
+  if (areas_are_still_visible) then gotoxy(2, 27);
+  
   if (wait) then begin
-    if (areas_are_still_visible) then gotoxy(2, 27);
     readkey;
     wait := false;
   end;
