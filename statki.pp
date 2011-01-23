@@ -947,7 +947,7 @@ begin
           { clrscr; }
           clearlines(1, 1, 40);
           areas_are_still_visible := false;
-          wait := true;
+          wait := false;
           menu;
         end;
         '0' : begin clrscr; halt; end;
