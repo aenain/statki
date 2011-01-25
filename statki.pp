@@ -39,7 +39,7 @@ const
   ship_mark = '#'; { znacznik statku na planszy }
   hit_mark = 'X'; { znacznik trafienia na planszy }
   miss_mark = 'O'; { znacznik pudła na planszy }
-  weights : array[0..5] of integer = (-1,0,1,2,3,4); { wagi pól, czyli gdzie najlepiej strzelać, -1 - trafienie, 0 - na pewno nie ma statków, im więcej, tym lepiej! }
+  { weights : array[0..5] of integer = (-1,0,1,2,3,4); } { wagi pól, czyli gdzie najlepiej strzelać, -1 - trafienie, 0 - na pewno nie ma statków, im więcej, tym lepiej! }
   initial_max_weight = 2; { maksymalna wartość wagi w tablicy initial_weights }
   initial_weights : area_of_weights = ((1,1,1,1,1,1,1,1,1,1),
                                        (1,2,1,1,2,1,1,1,2,1),
@@ -54,7 +54,7 @@ const
 
 var
   state : integer; { stan programu: 0 - brak rozgrywki, 1 - gracz vs cpu, 2 - cpu vs cpu }
-  target : shot; { miejsce, w ktore chcemy strzelic }
+  { target : shot; } { miejsce, w ktore chcemy strzelic }
   choice : char; { ostatnio nacisnieŧy klawisz do obslugi menu }
   { tablice z przedrostkiem player1 odnosza sie do pierwszego zawodnika, czy to cpu1 czy playera.
     ships_on_area - plansza widziana przez danego gracza z jego własnymi statkami i strzałami przeciwnika.
