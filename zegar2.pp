@@ -123,6 +123,7 @@ begin
     
     if (action = 3) then begin
       // TODO! budzik! { ustawianie + granie + wyłączanie }
+      action := 0; { nie da się budzika zaimplementować... sound i nosound nie działają }
     end;
     
     if (action = 11) then begin // running stoper :D
