@@ -1158,7 +1158,7 @@ begin
   clrscr;
   textcolor(7);
   gotoxy(2, 42);
-  write('Statki. Copyright 2010 Artur Hebda');
+  write('Statki. Copyright 2011 Artur Hebda');
   gotoxy(cursor.x, cursor.y);
 end;
 
