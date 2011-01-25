@@ -94,7 +94,15 @@ begin
     gotoxy(2, 26);
   end else begin
     gotoxy(2, 27);
-    write('Wybierz kierunek: 1.poziomo; 2.pionowo');
+    write('Wybierz kierunek: ');
+    textcolor(normal_color);
+    write('1. ');
+    textcolor(7);
+    write('poziomo ');
+    textcolor(normal_color);
+    write('2. ');
+    textcolor(7);
+    write('pionowo');
     gotoxy(2, 28);
   end;
   textcolor(input_color);
