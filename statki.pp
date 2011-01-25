@@ -912,6 +912,9 @@ end;
                     0 - wyswietla mozliwosc wyboru trybu gry }                  
                     
 procedure actions;
+var
+  good_choice : boolean;
+
 begin
   if (state = 0) then begin
     gotoxy(2, 41);
@@ -932,12 +935,19 @@ begin
     write('Zakończ ');
     gotoxy(2, 2);
     textcolor(input_color);
-    choice := readkey;
-    case choice of
-      '1': state := 1;
-      '2': state := 2;
-      '0': begin clrscr; halt; end;
-    end;
+
+    repeat
+      good_choice := false;
+      choice := readkey;
+    
+      case choice of
+        '1': begin state := 1; good_choice := true; end;
+        '2': begin state := 2; good_choice := true; end;
+        '0': begin clrscr; halt; end;
+      end;
+      
+    until (good_choice);
+    
     new_game;
   end;
   textcolor(normal_color);
@@ -996,6 +1006,9 @@ end;
 
 { METHOD: menu - wyswietlanie menu w zaleznosci od stanu programu }
 procedure menu;
+var
+  good_choice : boolean;
+
 begin
   textcolor(greeting_color);
   gotoxy(2, 41);
@@ -1018,20 +1031,27 @@ begin
     readkey;
     wait := false;
   end;
-  
-  choice := readkey;
-  clearlines(2, 2, 30);
 
-  case choice of
-    '1': actions;
-    '0': begin clrscr; halt; end;
-  end;
+  repeat
+  
+    good_choice := false;
+    choice := readkey;
+
+    case choice of
+      '1': begin good_choice := true; clearlines(2, 2, 30); actions; end;
+      '0': begin clrscr; halt; end;
+    end;
+    
+  until (good_choice);
   
   textcolor(normal_color);
 end;
 
 { METHOD: actions_game - wyświetla menu podczas trwania rozgrywki }
 procedure actions_game;
+var
+  good_choice : boolean;
+
 begin
   if (state = 2) then begin
     delay(500);
@@ -1075,20 +1095,24 @@ begin
       write('Zakończ ');
       clearlines(2, 25, 5);
       textcolor(input_color);
-
-      choice := readkey;
-      case choice of
-        '1': first_move;
-        '2': begin
-          state := 0;
-          { clrscr; }
-          clearlines(1, 1, 40);
-          areas_are_still_visible := false;
-          wait := false;
-          menu;
+      
+      repeat
+        good_choice := false;
+        choice := readkey;
+        case choice of
+          '1': first_move;
+          '2': begin
+            good_choice := true;
+            state := 0;
+            { clrscr; }
+            clearlines(1, 1, 40);
+            areas_are_still_visible := false;
+            wait := false;
+            menu;
+            end;
+          '0' : begin clrscr; halt; end;
         end;
-        '0' : begin clrscr; halt; end;
-      end;
+      until (good_choice);
     end else begin { przypadek, gdy gra się właśnie skończyła }
       menu;
     end;
