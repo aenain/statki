@@ -310,7 +310,7 @@ begin
 end;
 
 { METHOD: place_ship - ustawia statek w wybranym miejscu (wsp + kierunek + długość) i zwraca 1 jeśli sie udało to zrobić lub 0 jeśli nie }
-function place_ship(location : shot; kierunek : direction; length : integer; player: integer):integer;
+function place_ship(location : shot; kierunek : direction; length : integer; var player_ships_on_area: area):integer;
 var
   y_start, y_stop, y : char;
   x_start, x_stop, x : integer;
@@ -350,45 +350,23 @@ begin
   if(x_stop > N) then x_stop := N; { przypadek, gdy statek styka się z prawą krawędzia planszy }
 
   { sprawdzenie, czy wszystkie pola dookoła statku są wolne i czy pola pod statek też są wolne, i jeśli tak, to ich wypełnienie }
-  if(player = 1) then begin { ustalenie, na której planszy sprawdzać; pierwszy gracz }
-    for y := y_start to y_stop do begin
-      for x := x_start to x_stop do begin
-        if (player1_ships_on_area[y][x] <> default_mark ) then begin { znak na polu jest różny od domyślnego (oznaczającego pole bez statku) }
-          place_ship := 0;
-          exit;
-        end;
+  for y := y_start to y_stop do begin
+    for x := x_start to x_stop do begin
+      if (player_ships_on_area[y][x] <> default_mark ) then begin { znak na polu jest różny od domyślnego (oznaczającego pole bez statku) }
+        place_ship := 0;
+        exit;
       end;
     end;
+  end;
 
-    { pola są puste, można umieścić statek }
-    if (kierunek = pionowo) then begin
-      for y := location.y to chr(ord(location.y) + length - 1) do begin
-        player1_ships_on_area[y][location.x] := ship_mark;
-      end;
-    end else begin
-      for x := location.x to (location.x + length - 1) do begin
-        player1_ships_on_area[location.y][x] := ship_mark;
-      end;
+  { pola są puste, można umieścić statek }
+  if (kierunek = pionowo) then begin
+    for y := location.y to chr(ord(location.y) + length - 1) do begin
+      player_ships_on_area[y][location.x] := ship_mark;
     end;
-  end else begin { drugi gracz }
-    for y := y_start to y_stop do begin
-      for x := x_start to x_stop do begin
-        if (player2_ships_on_area[y][x] <> default_mark ) then begin { znak na polu jest różny od domyślnego (oznaczającego pole bez statku) }
-          place_ship := 0;
-          exit;
-        end;
-      end;
-    end;
-
-    { pola są puste, można umieścić statek }
-    if (kierunek = pionowo) then begin
-      for y := location.y to chr(ord(location.y) + length - 1) do begin
-        player2_ships_on_area[y][location.x] := ship_mark;
-      end;
-    end else begin
-      for x := location.x to (location.x + length - 1) do begin
-        player2_ships_on_area[location.y][x] := ship_mark;
-      end;
+  end else begin
+    for x := location.x to (location.x + length - 1) do begin
+      player_ships_on_area[location.y][x] := ship_mark;
     end;
   end;
 
@@ -426,7 +404,7 @@ begin
       end else begin
         kierunek := pionowo;
       end;
-      if (place_ship(location, kierunek, ships[i], 1) = 1) then begin { osatni parametr to numer gracza }
+      if (place_ship(location, kierunek, ships[i], player1_ships_on_area) = 1) then begin { osatni parametr to numer gracza }
         placed := 1; { udało się umieścić statek }
       end else begin
         error_wrong_place_for_ship;
@@ -456,12 +434,16 @@ begin
       location.x := 1 + random(N); { wartość z 1..N }
       { wybór kierunku, w którym zostanie umieszczony statek. Lewy górny róg statku będzie określany }
       wanted_direction := random(2) + 1; { 1 lub 2 }
-      if (wanted_direction = 1) then begin { ustawienie kierunku }
-        kierunek := poziomo;
+
+      if (wanted_direction = 1) then kierunek := poziomo { ustawienie kierunku }
+      else kierunek := pionowo;
+
+      if (player = 1) then begin
+        if (place_ship(location, kierunek, ships[i], player1_ships_on_area) = 1) then placed := 1; { ostatni parametr to plansza gracza: 1 lub 2; udało się umieścić statek }
       end else begin
-        kierunek := pionowo;
+        if (place_ship(location, kierunek, ships[i], player2_ships_on_area) = 1) then placed := 1;
       end;
-      if (place_ship(location, kierunek, ships[i], player) = 1) then placed := 1; { osatni parametr to numer gracza: 1 lub 2; udało się umieścić statek }
+
     until(placed = 1);
   end;
 end;
@@ -683,7 +665,7 @@ begin
 end; 
 
 { METHOD: update_weights - metoda, która aktualizuje wagi w tablicy danego playera w zależności od ostatniego strzału i jego powodzenia }
-procedure update_weights(player : integer; location : shot; skutek : string);
+procedure update_weights(var player_weights : area_of_weights; var player_last_hit : shot; var player_max_weight : integer; player : integer; location : shot; skutek : string);
 var
   y : char;
   x : integer;
@@ -693,120 +675,74 @@ begin
   any_change := 0;
   y := location.y;
   x := location.x;
+  
+  player_weights[y][x] := 0; { żeby nie strzelać drugi raz w to samo miejsce }
 
-  if (player = 1) then begin { strzelał pierwszy gracz }
-    player1_weights[y][x] := 0; { żeby nie strzelać drugi raz w to samo miejsce }
+  if (skutek = 'hit') then begin
+    player_weights[y][x] := -1; { trafienie oznaczmy jako -1 }
+    player_last_hit := location; { update ostatniego trafienia }
 
-    if (skutek = 'hit') then begin
-      player1_weights[y][x] := -1; { trafienie oznaczmy jako -1 }
-      player1_last_hit := location; { update ostatniego trafienia }
-      update_info_about_sinking(player1_weights, location, player1_last_hit, true, player1_sunken, player1_remain_ships_to_sink);
-      { przypadek 1. to pierwszy strzał w rejonie, wówczas:
-        pionowe i poziome pola przystające ustawiasz na 3,
-        skośne na 0 }
-      { przypadek 2. to drugi strzał w rejonie, wówczas: 
-        na skos zeruje, poziomo i pionowo: jeżeli 0, to zostawia, jeżeli nie, to 3 }
-      { miejsce trafienia ustawić na 0 }
-        { 1 2 3
-          8 X 4
-          7 6 5 reprezentacja pól dookoła trafionego ostatnio pola }
-      if (location.y > 'A') and (location.x > 1) then begin { #1 }
-        y := chr(ord(location.y) - 1);
-        x := location.x - 1;
-        if (player1_weights[y][x] > 0) then player1_weights[y][x] := 0;
-      end;
-      if (location.y > 'A') and (location.x < N) then begin { #3 }
-        y := chr(ord(location.y) - 1);
-        x := location.x + 1;
-        if (player1_weights[y][x] > 0) then player1_weights[y][x] := 0;
-      end;
-      if (location.y < M) and (location.x < N) then begin { #5 }
-        y := chr(ord(location.y) + 1);
-        x := location.x + 1;
-        if (player1_weights[y][x] > 0) then player1_weights[y][x] := 0;
-      end;
-      if (location.y < M) and (location.x > 1) then begin { #7 }
-        y := chr(ord(location.y) + 1);
-        x := location.x - 1;
-        if (player1_weights[y][x] > 0) then player1_weights[y][x] := 0;
-      end;
-      if (location.x > 1) then begin { #8 }
-        y := location.y;
-        x := location.x - 1;
-        if(player1_weights[y][x] > 0) then begin player1_weights[y][x] := 3; any_change := 1; end;
-      end;
-      if (location.x < N) then begin { #4 }
-        y := location.y;
-        x := location.x + 1;
-        if(player1_weights[y][x] > 0) then begin player1_weights[y][x] := 3; any_change := 1; end;
-      end;
-      if (location.y > 'A') then begin { #2 }
-        y := chr(ord(location.y) - 1);
-        x := location.x;
-        if(player1_weights[y][x] > 0) then begin player1_weights[y][x] := 3; any_change := 1; end;
-      end;
-      if (location.y < M) then begin { #6 }
-        y := chr(ord(location.y) + 1);
-        x := location.x;
-        if(player1_weights[y][x] > 0) then begin player1_weights[y][x] := 3; any_change := 1; end;
-      end;
-      if (any_change > 0) then player1_max_weight := 3; { w przynajmniej jedno pole wpisano 3, więc jest to najwyższa waga w tabeli playera1 }
-    
-    end else update_info_about_sinking(player1_weights, location, player1_last_hit, false, player1_sunken, player1_remain_ships_to_sink);
-  end else begin { strzelał drugi gracz }
-    player2_weights[y][x] := 0; { żeby nie strzelać drugi raz w to samo miejsce }
-    
-    if (skutek = 'hit') then begin
-      player2_weights[y][x] := -1; { trafienia ustawmy na -1 }
-      player2_last_hit := location; { update ostatniego trafienia }
-      update_info_about_sinking(player2_weights, location, player2_last_hit, true, player2_sunken, player2_remain_ships_to_sink);
-      { miejsce trafienia ustawić na 0 }
-        { 1 2 3
-          8 X 4
-          7 6 5 reprezentacja pól dookoła trafionego ostatnio pola }
-      if (location.y > 'A') and (location.x > 1) then begin { #1 }
-        y := chr(ord(location.y) - 1);
-        x := location.x - 1;
-        if (player2_weights[y][x] > 0) then player2_weights[y][x] := 0;
-      end;
-      if (location.y > 'A') and (location.x < N) then begin { #3 }
-        y := chr(ord(location.y) - 1);
-        x := location.x + 1;
-        if (player2_weights[y][x] > 0) then player2_weights[y][x] := 0;
-      end;
-      if (location.y < M) and (location.x < N) then begin { #5 }
-        y := chr(ord(location.y) + 1);
-        x := location.x + 1;
-        if (player2_weights[y][x] > 0) then player2_weights[y][x] := 0;
-      end;
-      if (location.y > 'A') and (location.x > 1) then begin { #7 }
-        y := chr(ord(location.y) + 1);
-        x := location.x - 1;
-        if (player2_weights[y][x] > 0) then player2_weights[y][x] := 0;
-      end;
-      if (location.x > 1) then begin { #8 }
-        y := location.y;
-        x := location.x - 1;
-        if(player2_weights[y][x] > 0) then begin player2_weights[y][x] := 3; any_change := 1; end;
-      end;
-      if (location.x < N) then begin { #4 }
-        y := location.y;
-        x := location.x + 1;
-        if(player2_weights[y][x] > 0) then begin player2_weights[y][x] := 3; any_change := 1; end;
-      end;
-      if (location.y > 'A') then begin { #2 }
-        y := chr(ord(location.y) - 1);
-        x := location.x;
-        if(player2_weights[y][x] > 0) then begin player2_weights[y][x] := 3; any_change := 1; end;
-      end;
-      if (location.y < M) then begin { #6 }
-        y := chr(ord(location.y) + 1);
-        x := location.x;
-        if(player2_weights[y][x] > 0) then begin player2_weights[y][x] := 3; any_change := 1; end;
-      end;
-      if (any_change > 0) then player2_max_weight := 3; { w przynajmniej jedno pole wpisano 3, więc jest to najwyższa waga w tabeli playera 2 }
-    
-    end else update_info_about_sinking(player2_weights, location, player2_last_hit, false, player2_sunken, player2_remain_ships_to_sink);
+    case player of
+      1 : update_info_about_sinking(player1_weights, location, player1_last_hit, true, player1_sunken, player1_remain_ships_to_sink);
+      2 : update_info_about_sinking(player2_weights, location, player2_last_hit, true, player2_sunken, player2_remain_ships_to_sink);
+    end;
+
+    { przypadek 1. to pierwszy strzał w rejonie, wówczas:
+      pionowe i poziome pola przystające ustawiasz na 3,
+      skośne na 0 }
+    { przypadek 2. to drugi strzał w rejonie, wówczas: 
+      na skos zeruje, poziomo i pionowo: jeżeli 0, to zostawia, jeżeli nie, to 3 }
+    { miejsce trafienia ustawić na 0 }
+      { 1 2 3
+        8 X 4
+        7 6 5 reprezentacja pól dookoła trafionego ostatnio pola }
+    if (location.y > 'A') and (location.x > 1) then begin { #1 }
+      y := pred(location.y);
+      x := location.x - 1;
+      if (player_weights[y][x] > 0) then player_weights[y][x] := 0;
+    end;
+    if (location.y > 'A') and (location.x < N) then begin { #3 }
+      y := pred(location.y);
+      x := location.x + 1;
+      if (player_weights[y][x] > 0) then player_weights[y][x] := 0;
+    end;
+    if (location.y < M) and (location.x < N) then begin { #5 }
+      y := succ(location.y);
+      x := location.x + 1;
+      if (player_weights[y][x] > 0) then player_weights[y][x] := 0;
+    end;
+    if (location.y < M) and (location.x > 1) then begin { #7 }
+      y := succ(location.y);
+      x := location.x - 1;
+      if (player_weights[y][x] > 0) then player_weights[y][x] := 0;
+    end;
+    if (location.x > 1) then begin { #8 }
+      y := location.y;
+      x := location.x - 1;
+      if(player_weights[y][x] > 0) then begin player_weights[y][x] := 3; any_change := 1; end;
+    end;
+    if (location.x < N) then begin { #4 }
+      y := location.y;
+      x := location.x + 1;
+      if(player_weights[y][x] > 0) then begin player_weights[y][x] := 3; any_change := 1; end;
+    end;
+    if (location.y > 'A') then begin { #2 }
+      y := pred(location.y);
+      x := location.x;
+      if(player_weights[y][x] > 0) then begin player_weights[y][x] := 3; any_change := 1; end;
+    end;
+    if (location.y < M) then begin { #6 }
+      y := succ(location.y);
+      x := location.x;
+      if(player_weights[y][x] > 0) then begin player_weights[y][x] := 3; any_change := 1; end;
+    end;
+    if (any_change > 0) then player_max_weight := 3; { w przynajmniej jedno pole wpisano 3, więc jest to najwyższa waga w tabeli playera1 }
+
+  end else begin
+    case player of
+      1 : update_info_about_sinking(player1_weights, location, player1_last_hit, false, player1_sunken, player1_remain_ships_to_sink);
+      2 : update_info_about_sinking(player2_weights, location, player2_last_hit, false, player2_sunken, player2_remain_ships_to_sink);
+    end;
   end;
 end;
 
@@ -868,11 +804,11 @@ begin
       player2_ships_on_area[location.y][location.x] := hit_mark; { przypisanie trafienia }
       player1_shots_on_area[location.y][location.x] := hit_mark;
       inc(player1_number_of_hits); { zwiększenie liczby trafień playera1 }
-      update_weights(1, location, 'hit'); { aktualizacja wag w tablicy playera1, ostatni parametr oznacza trafienie }
+      update_weights(player1_weights, player1_last_hit, player1_max_weight, 1, location, 'hit'); { aktualizacja wag w tablicy playera1, ostatni parametr oznacza trafienie }
     end else begin { pudło pierwszego gracza }
       player2_ships_on_area[location.y][location.x] := miss_mark; { przypisanie pudła }
       player1_shots_on_area[location.y][location.x] := miss_mark;
-      update_weights(1, location, 'miss'); { aktualizacja wag w tablicy playera1, ostatni parametr oznacza pudło }
+      update_weights(player1_weights, player1_last_hit, player1_max_weight, 1, location, 'miss'); { aktualizacja wag w tablicy playera1, ostatni parametr oznacza pudło }
     end;
   end else begin { strzelał drugi gracz }
     player2_last_shot := location; { ostatni oddany strzał przez tego gracza }
@@ -881,11 +817,11 @@ begin
       player1_ships_on_area[location.y][location.x] := hit_mark; { przypisanie trafienia }
       player2_shots_on_area[location.y][location.x] := hit_mark;
       inc(player2_number_of_hits); { zwiększenie liczby trafień playera2 }
-      update_weights(2, location, 'hit'); { aktualizacja wag w tablicy playera2, ostatni parametr oznacza trafienie }
+      update_weights(player2_weights, player2_last_hit, player2_max_weight, 2, location, 'hit'); { aktualizacja wag w tablicy playera2, ostatni parametr oznacza trafienie }
     end else begin { pudło drugiego gracza }
       player1_ships_on_area[location.y][location.x] := miss_mark; { przypisanie pudła }
       player2_shots_on_area[location.y][location.x] := miss_mark;
-      update_weights(2, location, 'miss'); { aktualizacja wag w tablicy playera2, ostatni parametr oznacza pudło }
+      update_weights(player2_weights, player2_last_hit, player2_max_weight, 2, location, 'miss'); { aktualizacja wag w tablicy playera2, ostatni parametr oznacza pudło }
     end;
   end;
 end;
