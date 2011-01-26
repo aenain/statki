@@ -404,7 +404,7 @@ begin
       end else begin
         kierunek := pionowo;
       end;
-      if (place_ship(location, kierunek, ships[i], player1_ships_on_area) = 1) then begin { osatni parametr to numer gracza }
+      if (place_ship(location, kierunek, ships[i], player1_ships_on_area) = 1) then begin { osatni parametr to plansza ze statkami gracza }
         placed := 1; { udało się umieścić statek }
       end else begin
         error_wrong_place_for_ship;
@@ -439,7 +439,7 @@ begin
       else kierunek := pionowo;
 
       if (player = 1) then begin
-        if (place_ship(location, kierunek, ships[i], player1_ships_on_area) = 1) then placed := 1; { ostatni parametr to plansza gracza: 1 lub 2; udało się umieścić statek }
+        if (place_ship(location, kierunek, ships[i], player1_ships_on_area) = 1) then placed := 1; { ostatni parametr to plansza ze statkami gracza: 1 lub 2; udało się umieścić statek }
       end else begin
         if (place_ship(location, kierunek, ships[i], player2_ships_on_area) = 1) then placed := 1;
       end;
