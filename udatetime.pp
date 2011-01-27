@@ -11,7 +11,7 @@ type
       time : ttime;
       procedure set_current;
       function to_s(with_date : boolean = true; with_time : boolean = true; time_should_be_first : boolean = false; with_year : boolean = true; with_current_year : boolean = false) : string;
-      constructor create;
+      constructor create(datetime : tdatetime = nil);
   end;
 
 function compare2datetimes(a, b : tdatetime) : integer; { spaceship operator }
@@ -38,10 +38,16 @@ begin
   end;
 end;
 
-constructor tdatetime.create;
+constructor tdatetime.create( datetime : tdatetime = nil);
 begin
-  self.date := tdate.create;
-  self.time := ttime.create;
+  if (datetime <> nil) then begin
+    self.date := tdate.create(datetime.date);
+    self.time := ttime.create(datetime.time);
+
+  end else begin
+    self.date := tdate.create;
+    self.time := ttime.create;
+  end;
 end;
 
 function compare2datetimes(a, b : tdatetime) : integer;

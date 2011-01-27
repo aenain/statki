@@ -13,7 +13,7 @@ type
       procedure to_time(sequence : string); overload;
       function to_period : longint; { TODO! napisać metodę zamieniająca time na longint (ilość centysekund, które upłynęły od początku dnia }
       procedure set_current;
-      constructor create;
+      constructor create(time : ttime = nil);
 
     private
       function add_0_if_less_than_10(const variable : word) : string;
@@ -95,12 +95,20 @@ begin
   add_0_if_less_than_10 := str_variable;
 end;
 
-constructor ttime.create; { init values }
+constructor ttime.create(time : ttime = nil); { init values }
 begin
-  self.hours := 0;
-  self.minutes := 0;
-  self.seconds := 0;
-  self.cs := 0;
+  if (time <> nil) then begin
+    self.hours := time.hours;
+    self.minutes := time.minutes;
+    self.seconds := time.seconds;
+    self.cs := time.cs;
+
+  end else begin
+    self.hours := 0;
+    self.minutes := 0;
+    self.seconds := 0;
+    self.cs := 0;
+  end;
 end;
 
 function compare2hours(a, b : ttime; with_seconds : boolean = false; with_cs : boolean = false) : integer;

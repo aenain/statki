@@ -102,10 +102,8 @@ begin
       current := tdatetime.create;
       current.set_current;
 
-      start_of_event := tdatetime.create;
-      finish_of_event := tdatetime.create;
-      start_of_event := event.start;
-      finish_of_event := event.finish;
+      start_of_event := tdatetime.create(event.start);
+      finish_of_event := tdatetime.create(event.finish);
 
       if (event.anniversary) then begin
         start_of_event.date.year := current.date.year;

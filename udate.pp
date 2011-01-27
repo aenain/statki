@@ -14,7 +14,7 @@ type
       procedure to_date(sequence : string); { z wykorzystaniem str postaci [dd.mm.yyyy] }
       procedure calculate_wday; { na podstawie dnia, miesiąca i roku oblicza dzień tygodnia i ustawia wday }
       function distance_from_now_in_days : integer; { zwraca różnicę pomiędzy datą, na której jest wywoływana }
-      constructor create;
+      constructor create(date : tdate = nil);
 
     private
       function length_of_months : tlength_of_months;
@@ -198,12 +198,20 @@ begin
   if (self.year mod 4 = 0) and (self.year mod 100 <> 0) or (self.year mod 400 = 0) then length_of_months[2] := 29;
 end;
 
-constructor tdate.create; { init values }
+constructor tdate.create(date : tdate = nil); { init values }
 begin
-  self.year := 1970;
-  self.month := 1;
-  self.day := 1;
-  self.calculate_wday;
+  if (date <> nil) then begin
+    self.year := date.year;
+    self.month := date.month;
+    self.day := date.day;
+    self.calculate_wday;
+
+  end else begin
+    self.year := 1970;
+    self.month := 1;
+    self.day := 1;
+    self.calculate_wday;
+  end;
 end;
 
 

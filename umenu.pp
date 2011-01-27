@@ -107,7 +107,7 @@ begin
 
   for i := low(events) to high(events) do begin
     output.clear_line;
-    output.print(events[i].to_a[0]); { TODO! print it with colors, to make it happy :D }
+    output.print(events[i].to_a[0]); { prints it with colors, to make it happy :D }
     output.print(events[i].to_a[1], false, 0, 0, 15);
     output.new_line;
 

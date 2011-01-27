@@ -75,9 +75,10 @@ begin
   setlength(splitted_content, 2);
   first_part := '';
   second_part := '';
+  which_anniversary_to_s := '';
 
   if (self.anniversary) and (self.which_anniversary > 0) then begin
-    str(which_anniversary, which_anniversary_to_s);
+    str(self.which_anniversary, which_anniversary_to_s);
     first_part := which_anniversary_to_s + '. ';
   end;
 
@@ -119,7 +120,7 @@ var
 begin
   date := tdate.create;
   date.set_current;
-  which_anniversary := date.year - self.start.date.year; 
+  which_anniversary := date.year - self.start.date.year;
 end;
 
 function tevent.less_than_a_day : boolean; { sprawdzenie, czy event zaczyna się i kończy tego samego dnia }
